@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>매장 근무표</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --emp-color: #16a34a;
+            --mgr-color: #2563eb;
+            --bg: #f7f8fa;
+            --card: #ffffff;
+            --border: #e5e7eb;
+            --text-main: #1f2937;
+            --text-sub: #6b7280;
+            --danger: #dc2626;
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 24px 20px 60px;
+            background-color: var(--bg);
+            color: var(--text-main);
+            transition: background-color 0.3s;
+        }
+        body.mode-emp { background-color: #f5faf6; }
+        body.mode-mgr { background-color: #f5f8fc; }
+
+        .page { max-width: 1200px; margin: 0 auto; }
+
+        .site-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .header-logo-btn {
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            width: 46px;
+            height: 46px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+            transition: 0.15s;
+        }
+        .header-logo-btn:hover { background: #f3f4f6; }
+        .header-logo-btn:active { transform: scale(0.96); }
+        .header-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .header-logo-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: var(--text-sub);
+            border: 1.5px dashed var(--border);
+            border-radius: 10px;
+        }
+        .header-title {
+            font-weight: 700;
+            font-size: 17px;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(17, 24, 39, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 20px;
+        }
+        .modal-box {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 24px;
+            width: min(320px, 100%);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+        }
+        .modal-box h3 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+        .modal-box p { margin: 0 0 16px; font-size: 13px; color: var(--text-sub); line-height: 1.4; }
+        .modal-input {
+            width: 100%;
+            font-size: 24px;
+            letter-spacing: 10px;
+            text-align: center;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            font-family: inherit;
+        }
+        .modal-error { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
+        .modal-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 0 0 20px;
+            letter-spacing: -0.02em;
+        }
+
+        .warning-msg {
+            color: var(--danger);
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 16px;
+            min-height: 20px;
+        }
+
+        .mode-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            padding: 10px;
+            background: var(--card);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+        }
+        .mode-label {
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 999px;
+            transition: 0.15s;
+            color: var(--text-sub);
+        }
+        .mode-label:hover { background: #f3f4f6; }
+        .mode-emp-active { color: #fff; background: var(--emp-color); }
+        .mode-mgr-active { color: #fff; background: var(--mgr-color); }
+        .mode-emp-active:hover, .mode-mgr-active:hover { filter: brightness(1.05); }
+        input[type="radio"] { display: none; }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 24px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        select, button {
+            padding: 9px 14px;
+            font-size: 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text-main);
+            font-family: inherit;
+        }
+        button { cursor: pointer; font-weight: 600; transition: 0.15s; border: 1px solid transparent; }
+        button:hover { filter: brightness(0.96); transform: translateY(-1px); }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-excel { background-color: #16a34a; color: white; }
+        .btn-refresh { background-color: #4b5563; color: white; }
+        .btn-reset { background-color: var(--danger); color: white; }
+        .btn-neutral { background-color: #f3f4f6; color: var(--text-main); }
+
+        .main-container { display: flex; gap: 20px; align-items: flex-start; }
+        .calendar-section { flex: 3; min-width: 0; }
+        .summary-section {
+            flex: 1;
+            background: var(--card);
+            padding: 18px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            position: sticky;
+            top: 20px;
+            min-width: 250px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+
+        .calendar-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+        .calendar-header div {
+            padding: 8px;
+            background-color: var(--card);
+            border-radius: 8px;
+            color: var(--text-sub);
+        }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .day-cell {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            min-height: 140px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.15s;
+        }
+        .day-cell:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+        .date-label {
+            text-align: right;
+            font-weight: 700;
+            font-size: 13px;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-sub);
+        }
+        .sun, .holiday { color: #e11d48; }
+        .sat { color: #2563eb; }
+        .emp-list { display: flex; flex-direction: column; gap: 4px; flex-grow: 1; }
+        .emp-item {
+            font-size: 12px;
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid #f0f0f2;
+            background: #fafafa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: all 0.12s;
+        }
+        .emp-item:hover { filter: brightness(0.96); transform: scale(1.02); z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+
+        .status-unassigned { color: #b0b3b8; }
+        .status-shift { background-color: #eef4ff; border-color: #cddcff; color: #1d4ed8; font-weight: 600; }
+        .status-휴무 { background-color: #fdeef0; border-color: #fbd3d8; color: #d1273f; }
+        .status-필수휴무 { background-color: #fbdfe3; border-color: #f5b8c0; color: #b3122b; font-weight: 600; }
+        .status-연차 { background-color: #eaf9ee; border-color: #c9f0d2; color: #157a37; }
+        .status-반차 { background-color: #f0edfd; border-color: #d9d1fb; color: #5b3dc7; }
+        .status-본사 { background-color: #f8eefc; border-color: #ecd3f5; color: #8f2bb0; }
+        .status-교육 { background-color: #fff4e8; border-color: #ffdfb3; color: #c06400; }
+        .status-공가 { background-color: #e8f7f5; border-color: #bfe9e3; color: #0d766a; }
+
+        .status-text { font-weight: 600; font-size: 11px; }
+
+        .summary-section h2 {
+            font-size: 15px;
+            font-weight: 700;
+            margin: 0 0 14px;
+            text-align: center;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        .target-info {
+            text-align: center;
+            font-weight: 600;
+            margin-bottom: 14px;
+            font-size: 13px;
+            background: #eef4ff;
+            color: #1d4ed8;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .summary-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 12.5px; }
+        .summary-table th, .summary-table td { border-bottom: 1px solid var(--border); padding: 8px 4px; }
+        .summary-table th { color: var(--text-sub); font-weight: 600; }
+        .over-limit { color: var(--danger); font-weight: 700; }
+        .perfect { color: #16a34a; font-weight: 700; }
+        .under-limit { color: var(--text-sub); }
+
+        .excel-section {
+            display: none;
+            background: var(--card);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+        .excel-table { border-collapse: collapse; width: max-content; font-size: 13px; text-align: center; }
+        .excel-table th, .excel-table td { border: 1px solid #e2e2e5; padding: 5px 8px; min-width: 25px; height: 30px; }
+        .excel-table th { background-color: #f7f8fa; font-weight: 600; }
+        .excel-table td.name-col { background-color: #fafafa; font-weight: 600; white-space: nowrap; }
+        .excel-title { font-size: 16px; font-weight: 700; text-align: left; border: none !important; background: transparent !important; }
+
+        @media (max-width: 900px) {
+            .main-container { flex-direction: column; }
+            .summary-section { position: static; width: 100%; }
+        }
+
+        .notify-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 9999;
+            max-width: 320px;
+            pointer-events: none;
+        }
+        .toast {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: 10px;
+            padding: 12px 14px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            font-size: 13px;
+            line-height: 1.45;
+            color: var(--text-main);
+            opacity: 0;
+            transform: translateX(24px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .toast-icon { font-size: 16px; line-height: 1; }
+        .toast-text strong { color: var(--primary); }
+        .toast.reset { border-left-color: var(--danger); }
+        .toast.reset .toast-text strong { color: var(--danger); }
+
+        @media print {
+            .mode-container, .controls, .warning-msg { display: none; }
+            body { margin: 0; background-color: white; padding: 0; }
+            .main-container { display: block; }
+            .calendar-grid { gap: 2px; }
+            .day-cell { border-color: #666; break-inside: avoid; min-height: 100px; }
+            .summary-section { margin-top: 20px; page-break-inside: avoid; position: static; border: none; padding: 0; box-shadow: none; }
+            .excel-section { box-shadow: none; padding: 0; border: none; }
+        }
+    </style>
+</head>
+<body class="mode-emp" id="bodyElement">
+<div id="notifyContainer" class="notify-container"></div>
+<div class="page">
+
+    <header class="site-header">
+        <button type="button" class="header-logo-btn" id="headerLogoBtn" onclick="triggerHeaderImageChange()" title="클릭하여 회사 아이콘 설정 (관리자 비밀번호 필요)">
+            <img id="headerLogo" class="header-logo" src="" alt="회사 아이콘" style="display:none;">
+            <span id="headerLogoPlaceholder" class="header-logo-placeholder">🏢</span>
+        </button>
+        <span class="header-title">매장 근무표</span>
+        <input type="file" id="headerImageInput" accept="image/*" style="display:none;" onchange="onHeaderImageSelected(event)">
+    </header>
+
+
+    <h1><span id="displayYear">2026</span>년 <span id="displayMonth">10</span>월 근무 계획</h1>
+
+    <div class="warning-msg" id="warningMsg"></div>
+
+    <div class="mode-container" id="modeContainer">
+        <label class="mode-label mode-emp-active" id="labelEmp">
+            <input type="radio" name="inputMode" value="employee" checked onchange="changeMode()">
+            🟢 직원 휴무 신청
+        </label>
+        <label class="mode-label" id="labelMgr">
+            <input type="radio" name="inputMode" value="manager" onchange="changeMode()">
+            🔵 관리자 근무 배정
+        </label>
+    </div>
+
+    <div id="adminBar" style="display:none; text-align:center; margin-bottom:16px; font-size:13px; color:var(--text-sub);">
+        관리자로 로그인됨: <strong id="adminEmailLabel"></strong>
+        <button type="button" class="btn-neutral" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="adminLogout()">로그아웃</button>
+    </div>
+
+    <div class="controls">
+        <select id="yearSelect" onchange="renderAll()"></select>
+        <select id="monthSelect" onchange="renderAll()"></select>
+        <button class="btn-primary" onclick="renderAll()">날짜 이동</button>
+        <button class="btn-refresh" onclick="refreshFromServer()">새로고침</button>
+        <button class="btn-neutral" id="toggleBtn" onclick="toggleView()">엑셀 양식으로 보기</button>
+        <button class="btn-excel" onclick="downloadExcel()">엑셀 파일(.xls) 다운로드</button>
+        <button class="btn-reset" onclick="resetData()">전체 초기화</button>
+        <button class="btn-neutral" onclick="window.print()">인쇄</button>
+    </div>
+
+    <div id="calendarView" class="main-container">
+        <div class="calendar-section">
+            <div class="calendar-header">
+                <div class="sun">일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div class="sat">토</div>
+            </div>
+            <div id="calendarGrid" class="calendar-grid"></div>
+        </div>
+
+        <div class="summary-section">
+            <h2>휴무 사용 현황</h2>
+            <div class="target-info">
+                이번 달 휴무 목표일수:
+                <select id="quotaSelect" onchange="onQuotaChange()"></select>
+                <div style="font-size: 11px; color: var(--text-sub); margin-top: 6px;">직접 선택 가능 (8~15일)</div>
+            </div>
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>성명</th>
+                        <th>사용</th>
+                        <th>잔여</th>
+                        <th>상태</th>
+                    </tr>
+                </thead>
+                <tbody id="summaryBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="excelView" class="excel-section">
+        <table id="excelTable" class="excel-table">
+            <thead id="excelThead"></thead>
+            <tbody id="excelTbody"></tbody>
+        </table>
+    </div>
+
+</div>
+
+    <div id="loginModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <h3 id="modalTitle">관리자 로그인</h3>
+            <p id="modalDesc">관리자 이메일과 비밀번호를 입력하세요.</p>
+            <input type="email" id="modalEmailInput" placeholder="admin@example.com" autocomplete="username"
+                   style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:14px; margin-bottom:8px;">
+            <input type="password" id="modalPasswordInput" placeholder="비밀번호" autocomplete="current-password"
+                   style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:14px;">
+            <div id="modalError" class="modal-error"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn-neutral" onclick="closeLoginModal()">취소</button>
+                <button type="button" class="btn-primary" onclick="confirmLoginModal()">로그인</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ====================================================
+        // 1) 파이어베이스 설정
+        //    Firebase 콘솔 > 프로젝트 설정 > 내 앱(웹) 에서 복사한
+        //    firebaseConfig 값으로 아래 칸을 채워주세요.
+        // ====================================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import {
+            getFirestore, collection, doc, getDoc, getDocs, setDoc,
+            onSnapshot, writeBatch
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import {
+            getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyC8yo_L_nvWzPg1DxJ5OZtTGb3NkTHHwws",
+            authDomain: "acetgw.firebaseapp.com",
+            projectId: "acetgw",
+            storageBucket: "acetgw.firebasestorage.app",
+            messagingSenderId: "1096530647976",
+            appId: "1:1096530647976:web:2b9afa33f2485489f01b9d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // ====================================================
+        // 2) 파이어스토어 저장 구조
+        //    schedule/{날짜}          예: schedule/2026-10-05  -> { 홍길동: "휴무", ... }
+        //    settings/main            -> { headerImageUrl: "..." }
+        //    settings/monthlyQuotas   -> { "2026-10": 10, ... }
+        //    meta/lastChange          -> 실시간 알림용 마지막 변경 정보
+        //
+        //    관리자 계정은 비밀번호가 아니라 Firebase 인증(이메일/비밀번호)으로 관리됩니다.
+        //    Firebase 콘솔 > Authentication > Users 에서 관리자 계정을 직접 추가해주세요.
+        //    거기에 등록된 이메일로 로그인하면 관리자로 인정됩니다.
+        // ====================================================
+        let currentUser = null;
+        let isAdmin = false;
+
+        const employees = [
+            { title: '과장', name: '신호철', type: 'general' },
+            { title: '과장', name: '김종현', type: 'general' },
+            { title: '대리', name: '손충현', type: 'general' },
+            { title: '계장', name: '김진우', type: 'general' },
+            { title: '사원', name: '김범기', type: 'general' },
+            { title: '사원', name: '박진형', type: 'general' },
+            { title: '사원', name: '임은구', type: 'general' },
+            { title: 'AR', name: 'AR', type: 'ar' }
+        ];
+
+        const cycleEmp = ['', '휴무', '필수휴무', '연차', '반차', '본사', '교육', '공가'];
+        const cycleMgrGeneral = ['', '조출', '09~19', '마감'];
+        const cycleMgrAR = ['', '07~16', '11~20'];
+
+        const shortStatuses = {
+            '조출': '조출', '07~17': '조출', '09~19': '09~19', '마감': '마감', '10~20': '10~20',
+            '07~16': '07~16', '11~20': '11~20',
+            '휴무': '휴', '필수휴무': '필휴', '연차': '연', '반차': '반', '본사': '본', '교육': '교', '공가': '공', '': ''
+        };
+
+        let monthlyQuotas = {};
+        let settings = {};
+
+        let scheduleData = {};
+        let currentView = 'calendar';
+        let currentMode = 'employee';
+        let loginModalContext = null; // 'manager' | 'header_image' | 'reset'
+        let pendingHeaderImageFile = null;
+
+        // 이 브라우저 탭을 구분하는 고유 ID (내가 만든 변경은 알림 제외)
+        const clientId = 'c_' + Math.random().toString(36).slice(2) + '_' + Date.now();
+        let lastSeenTs = 0;
+        let firstMetaSnapshot = true;
+
+        const fixedHolidays = {
+            '01-01': '신정', '03-01': '삼일절', '05-05': '어린이날',
+            '06-06': '현충일', '08-15': '광복절', '10-03': '개천절',
+            '10-09': '한글날', '12-25': '성탄절'
+        };
+
+        const variableHolidays = {
+            '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
+            '2026-03-02': '대체공휴일', '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일',
+            '2026-06-03': '지방선거', '2026-08-17': '대체공휴일',
+            '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴', '2026-09-28': '대체공휴일',
+            '2026-10-05': '대체공휴일',
+        };
+
+        const weekdaysKr = ['일', '월', '화', '수', '목', '금', '토'];
+
+        function getHolidayName(year, month, day) {
+            const md = `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const ymd = `${year}-${md}`;
+            if (variableHolidays[ymd]) return variableHolidays[ymd];
+            if (fixedHolidays[md]) return fixedHolidays[md];
+            return null;
+        }
+
+        function reportError(action, err) {
+            console.error(action, err);
+            alert(action + ' 중 오류가 발생했습니다.\n' + (err && err.message ? err.message : err));
+        }
+
+        // ====================================================
+        // 3) 파이어스토어 읽기/쓰기 함수
+        // ====================================================
+        async function recordChange(meta) {
+            try {
+                await setDoc(doc(db, 'meta', 'lastChange'), {
+                    ts: Date.now(),
+                    clientId: clientId,
+                    date: (meta && meta.date) || '',
+                    name: (meta && meta.name) || '',
+                    status: (meta && meta.status) || '',
+                    action: (meta && meta.action) || 'update'
+                });
+            } catch (err) {
+                console.error('recordChange', err);
+            }
+        }
+
+        // 한 사람의 하루 상태 저장 (해당 날짜 문서 하나만 갱신)
+        async function saveDayStatus(dateStr, name, status) {
+            try {
+                await setDoc(doc(db, 'schedule', dateStr), { [name]: status }, { merge: true });
+                await recordChange({ date: dateStr, name: name, status: status, action: 'update' });
+            } catch (err) {
+                reportError('저장', err);
+            }
+        }
+
+        async function saveMonthlyQuota(yearMonth, quota) {
+            try {
+                await setDoc(doc(db, 'settings', 'monthlyQuotas'), { [yearMonth]: quota }, { merge: true });
+                await recordChange({ date: yearMonth, status: quota + '일', action: 'quota' });
+            } catch (err) {
+                reportError('휴무 목표일수 저장', err);
+            }
+        }
+
+        async function loadAllOnce() {
+            const [schedSnap, settingsSnap, quotaSnap] = await Promise.all([
+                getDocs(collection(db, 'schedule')),
+                getDoc(doc(db, 'settings', 'main')),
+                getDoc(doc(db, 'settings', 'monthlyQuotas'))
+            ]);
+            const data = {};
+            schedSnap.forEach(d => { data[d.id] = d.data(); });
+            scheduleData = data;
+            settings = settingsSnap.exists() ? settingsSnap.data() : {};
+            monthlyQuotas = quotaSnap.exists() ? quotaSnap.data() : {};
+        }
+
+        // ====== Firebase 인증 (관리자 로그인) ======
+        function watchAuthState() {
+            onAuthStateChanged(auth, (user) => {
+                currentUser = user;
+                isAdmin = !!user;
+                updateAdminBar();
+                if (!isAdmin && currentMode === 'manager') {
+                    // 로그아웃되면 관리자 모드에서 자동으로 나감
+                    applyModeChange('employee');
+                }
+            });
+        }
+
+        function updateAdminBar() {
+            const bar = document.getElementById('adminBar');
+            const label = document.getElementById('adminEmailLabel');
+            if (isAdmin && currentUser) {
+                label.textContent = currentUser.email;
+                bar.style.display = 'block';
+            } else {
+                bar.style.display = 'none';
+            }
+        }
+
+        async function loginAdmin(email, password) {
+            const cred = await signInWithEmailAndPassword(auth, email, password);
+            return cred.user;
+        }
+
+        async function adminLogout() {
+            try {
+                await signOut(auth);
+            } catch (err) {
+                reportError('로그아웃', err);
+            }
+        }
+
+        // 이미지를 작게 줄여서(최대 200px) 텍스트로 변환 -> 설정 문서에 바로 저장
+        function resizeImageToDataUrl(file, maxSize) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onerror = () => reject(new Error('이미지를 불러올 수 없습니다.'));
+                    img.onload = () => {
+                        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+                        const w = Math.max(1, Math.round(img.width * scale));
+                        const h = Math.max(1, Math.round(img.height * scale));
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        resolve(canvas.toDataURL('image/png'));
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ====================================================
+        // 4) 화면 초기화 + 실시간 동기화
+        // ====================================================
+        function init() {
+            populateQuotaSelect();
+
+            const ySel = document.getElementById('yearSelect');
+            const mSel = document.getElementById('monthSelect');
+            for (let y = 2024; y <= 2030; y++) {
+                ySel.add(new Option(y + '년', y, false, y === 2026));
+            }
+            for (let m = 1; m <= 12; m++) {
+                mSel.add(new Option(m + '월', m, false, m === 10));
+            }
+
+            renderAll();
+            startRealtime();
+            watchAuthState();
+        }
+
+        function startRealtime() {
+            // 근무 데이터: 누군가 바꾸면 바로 화면에 반영
+            onSnapshot(collection(db, 'schedule'), (snap) => {
+                const data = {};
+                snap.forEach(d => { data[d.id] = d.data(); });
+                scheduleData = data;
+                renderAll();
+            }, (err) => console.error('schedule listener', err));
+
+            // 설정(헤더 이미지, 비밀번호)
+            onSnapshot(doc(db, 'settings', 'main'), (snap) => {
+                settings = snap.exists() ? snap.data() : {};
+                applySettings();
+            }, (err) => console.error('settings listener', err));
+
+            // 월별 휴무 목표일수
+            onSnapshot(doc(db, 'settings', 'monthlyQuotas'), (snap) => {
+                monthlyQuotas = snap.exists() ? snap.data() : {};
+                renderAll();
+            }, (err) => console.error('quota listener', err));
+
+            // 변경 알림(토스트)
+            onSnapshot(doc(db, 'meta', 'lastChange'), (snap) => {
+                if (!snap.exists()) { firstMetaSnapshot = false; return; }
+                const info = snap.data();
+                if (firstMetaSnapshot) {
+                    // 페이지를 열자마자 예전 변경 알림이 뜨지 않도록 기준점만 잡음
+                    firstMetaSnapshot = false;
+                    lastSeenTs = info.ts || 0;
+                    return;
+                }
+                if (!info.ts || info.ts <= lastSeenTs) return;
+                lastSeenTs = info.ts;
+                if (info.clientId === clientId) return; // 내가 만든 변경은 알림 없음
+                showNotification(info);
+            }, (err) => console.error('meta listener', err));
+        }
+
+        function populateQuotaSelect() {
+            const quotaSelect = document.getElementById('quotaSelect');
+            quotaSelect.innerHTML = '';
+            for (let i = 8; i <= 15; i++) {
+                quotaSelect.add(new Option(i + '일', i));
+            }
+        }
+
+        function applySettings() {
+            const logo = document.getElementById('headerLogo');
+            const placeholder = document.getElementById('headerLogoPlaceholder');
+            const url = settings['headerImageUrl'];
+            if (url) {
+                logo.src = url;
+                logo.style.display = 'block';
+                placeholder.style.display = 'none';
+            } else {
+                logo.style.display = 'none';
+                logo.removeAttribute('src');
+                placeholder.style.display = 'flex';
+            }
+        }
+
+        function showNotification(info) {
+            const container = document.getElementById('notifyContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast' + (info.action === 'reset' ? ' reset' : '');
+
+            let msg;
+            if (info.action === 'reset') {
+                msg = `<strong>근무표 전체 초기화</strong>가 발생했습니다.`;
+            } else if (info.action === 'quota') {
+                msg = `<strong>${info.date}</strong> 월의 휴무 목표일수가 <strong>${info.status}</strong>(으)로 변경되었습니다.`;
+            } else if (info.action === 'header_image') {
+                msg = `헤더 이미지가 변경되었습니다.`;
+            } else if (info.name) {
+                const dateLabel = info.date ? `${info.date} ` : '';
+                const statusLabel = info.status ? info.status : '미지정';
+                msg = `<strong>${info.name}</strong>님이 ${dateLabel}근무 정보를 <strong>${statusLabel}</strong>(으)로 변경했습니다.`;
+            } else {
+                msg = `새로운 근무 데이터가 입력되었습니다.`;
+            }
+
+            toast.innerHTML = `<div class="toast-icon">🔔</div><div class="toast-text">${msg}</div>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 4500);
+        }
+
+        // 수동 새로고침 (실시간 동기화가 기본이지만 버튼도 유지)
+        async function refreshFromServer() {
+            try {
+                await loadAllOnce();
+                applySettings();
+                renderAll();
+            } catch (err) {
+                reportError('새로고침', err);
+            }
+        }
+
+        function resetData() {
+            if (!isAdmin) {
+                openLoginModal('reset');
+                return;
+            }
+            performReset();
+        }
+
+        async function performReset() {
+            if (!confirm("정말 모든 입력 내용을 초기화하시겠습니까? (파이어스토어 근무 데이터도 함께 비워집니다)")) return;
+            try {
+                const snap = await getDocs(collection(db, 'schedule'));
+                const docs = snap.docs;
+                for (let i = 0; i < docs.length; i += 400) {
+                    const batch = writeBatch(db);
+                    docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                }
+                scheduleData = {};
+                await recordChange({ action: 'reset' });
+                renderAll();
+            } catch (err) {
+                reportError('초기화', err);
+            }
+        }
+
+        function changeMode() {
+            const mgrRadio = document.querySelector('input[name="inputMode"][value="manager"]');
+            const empRadio = document.querySelector('input[name="inputMode"][value="employee"]');
+
+            if (mgrRadio.checked && currentMode !== 'manager') {
+                if (isAdmin) {
+                    // 이미 로그인되어 있으면 바로 전환
+                    applyModeChange('manager');
+                    return;
+                }
+                // 로그인 확인 전까지는 화면을 직원 모드로 되돌려 둔다
+                mgrRadio.checked = false;
+                empRadio.checked = true;
+                openLoginModal('manager');
+                return;
+            }
+            if (empRadio.checked) {
+                applyModeChange('employee');
+            }
+        }
+
+        function applyModeChange(mode) {
+            currentMode = mode;
+            const body = document.getElementById('bodyElement');
+            const labelEmp = document.getElementById('labelEmp');
+            const labelMgr = document.getElementById('labelMgr');
+            const mgrRadio = document.querySelector('input[name="inputMode"][value="manager"]');
+            const empRadio = document.querySelector('input[name="inputMode"][value="employee"]');
+
+            if (mode === 'employee') {
+                body.className = 'mode-emp';
+                labelEmp.classList.add('mode-emp-active');
+                labelMgr.classList.remove('mode-mgr-active');
+                empRadio.checked = true;
+                mgrRadio.checked = false;
+            } else {
+                body.className = 'mode-mgr';
+                labelMgr.classList.add('mode-mgr-active');
+                labelEmp.classList.remove('mode-emp-active');
+                mgrRadio.checked = true;
+                empRadio.checked = false;
+            }
+        }
+
+        // ====== 로그인 모달 (관리자 모드 전환 / 헤더 이미지 변경 / 초기화 공용) ======
+        function openLoginModal(context) {
+            loginModalContext = context;
+            const errorDiv = document.getElementById('modalError');
+            errorDiv.style.display = 'none';
+            errorDiv.textContent = '';
+            document.getElementById('modalEmailInput').value = '';
+            document.getElementById('modalPasswordInput').value = '';
+
+            if (context === 'manager') {
+                document.getElementById('modalTitle').textContent = '관리자 모드 전환';
+                document.getElementById('modalDesc').textContent = '관리자 근무 배정 모드로 전환하려면 관리자 계정으로 로그인하세요.';
+            } else if (context === 'header_image') {
+                document.getElementById('modalTitle').textContent = '헤더 이미지 변경';
+                document.getElementById('modalDesc').textContent = '이미지를 업로드하려면 관리자 계정으로 로그인하세요.';
+            } else if (context === 'reset') {
+                document.getElementById('modalTitle').textContent = '전체 초기화';
+                document.getElementById('modalDesc').textContent = '초기화하려면 관리자 계정으로 로그인하세요.';
+            }
+
+            document.getElementById('loginModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('modalEmailInput').focus(), 50);
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+            loginModalContext = null;
+            pendingHeaderImageFile = null;
+            const fileInput = document.getElementById('headerImageInput');
+            if (fileInput) fileInput.value = ''; // 취소 후 같은 파일을 다시 선택해도 이벤트가 발생하도록 초기화
+        }
+
+        async function confirmLoginModal() {
+            const email = document.getElementById('modalEmailInput').value.trim();
+            const password = document.getElementById('modalPasswordInput').value;
+            const errorDiv = document.getElementById('modalError');
+
+            if (!email || !password) {
+                errorDiv.textContent = '이메일과 비밀번호를 모두 입력해주세요.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            try {
+                await loginAdmin(email, password);
+            } catch (err) {
+                errorDiv.textContent = '로그인 실패: 이메일 또는 비밀번호를 확인해주세요.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            const context = loginModalContext;
+            if (context === 'manager') {
+                applyModeChange('manager');
+                closeLoginModal();
+            } else if (context === 'header_image') {
+                if (!pendingHeaderImageFile) {
+                    closeLoginModal();
+                    return;
+                }
+                await submitHeaderImageUpload(pendingHeaderImageFile);
+            } else if (context === 'reset') {
+                closeLoginModal();
+                await performReset();
+            } else {
+                closeLoginModal();
+            }
+        }
+
+        // ====== 헤더 이미지 업로드 (파이어스토어 설정 문서에 저장) ======
+        function triggerHeaderImageChange() {
+            document.getElementById('headerImageInput').click();
+        }
+
+        function onHeaderImageSelected(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                alert('이미지 용량은 5MB 이하로 올려주세요.');
+                event.target.value = '';
+                return;
+            }
+            if (isAdmin) {
+                // 이미 로그인되어 있으면 바로 업로드
+                submitHeaderImageUpload(file);
+                return;
+            }
+            pendingHeaderImageFile = file;
+            openLoginModal('header_image');
+        }
+
+        async function submitHeaderImageUpload(file) {
+            const errorDiv = document.getElementById('modalError');
+            try {
+                const dataUrl = await resizeImageToDataUrl(file, 200);
+                await setDoc(doc(db, 'settings', 'main'), { headerImageUrl: dataUrl }, { merge: true });
+                settings['headerImageUrl'] = dataUrl;
+                applySettings();
+                await recordChange({ status: '헤더 이미지 변경', action: 'header_image' });
+                closeLoginModal();
+                const fileInput = document.getElementById('headerImageInput');
+                if (fileInput) fileInput.value = '';
+            } catch (err) {
+                if (errorDiv) {
+                    errorDiv.textContent = '업로드 중 오류: ' + err.message;
+                    errorDiv.style.display = 'block';
+                } else {
+                    reportError('헤더 이미지 업로드', err);
+                }
+            }
+        }
+
+        function toggleView() {
+            const calView = document.getElementById('calendarView');
+            const excelView = document.getElementById('excelView');
+            const toggleBtn = document.getElementById('toggleBtn');
+            const modeCont = document.getElementById('modeContainer');
+
+            if (currentView === 'calendar') {
+                calView.style.display = 'none';
+                excelView.style.display = 'block';
+                modeCont.style.display = 'none';
+                toggleBtn.textContent = '달력 양식으로 돌아가기';
+                currentView = 'excel';
+            } else {
+                calView.style.display = 'flex';
+                excelView.style.display = 'none';
+                modeCont.style.display = 'flex';
+                toggleBtn.textContent = '엑셀 양식으로 보기';
+                currentView = 'calendar';
+            }
+            renderAll();
+        }
+
+        function renderAll() {
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            document.getElementById('displayYear').textContent = year;
+            document.getElementById('displayMonth').textContent = month;
+
+            renderCalendar(year, month, daysInMonth);
+            renderExcel(year, month, daysInMonth);
+
+            checkConsecutiveWork(year, month, daysInMonth);
+            updateSummary(year, month, daysInMonth);
+        }
+
+        function getStatusClass(status) {
+            if (status === '휴무') return 'status-휴무';
+            if (status === '필수휴무') return 'status-필수휴무';
+            if (status === '연차') return 'status-연차';
+            if (status === '반차') return 'status-반차';
+            if (status === '본사') return 'status-본사';
+            if (status === '교육') return 'status-교육';
+            if (status === '공가') return 'status-공가';
+            if (['조출', '09~19', '마감', '07~16', '11~20'].includes(status)) return 'status-shift';
+            return 'status-unassigned';
+        }
+
+        function cycleStatus(dateStr, empName, empType) {
+            if (!scheduleData[dateStr]) scheduleData[dateStr] = {};
+            let current = scheduleData[dateStr][empName] || '';
+
+            if (currentMode === 'employee') {
+                let idx = cycleEmp.indexOf(current);
+                if (idx === -1) idx = 0;
+                let nextIdx = (idx + 1) % cycleEmp.length;
+                scheduleData[dateStr][empName] = cycleEmp[nextIdx];
+
+            } else if (currentMode === 'manager') {
+                if (cycleEmp.includes(current) && current !== '') {
+                    alert(`해당 직원이 이미 [${current}]를 신청한 상태입니다.\n변경을 원하시면 '🟢 직원 휴무 신청' 모드에서 취소 후 배정해 주세요.`);
+                    return;
+                }
+
+                const cycleMgr = (empType === 'ar') ? cycleMgrAR : cycleMgrGeneral;
+                let idx = cycleMgr.indexOf(current);
+                if (idx === -1) idx = 0;
+                let nextIdx = (idx + 1) % cycleMgr.length;
+                scheduleData[dateStr][empName] = cycleMgr[nextIdx];
+            }
+
+            saveDayStatus(dateStr, empName, scheduleData[dateStr][empName]);
+            renderAll();
+        }
+
+        function checkConsecutiveWork(year, month, daysInMonth) {
+            let warnings = [];
+            const workingStatuses = ['조출', '09~19', '마감', '07~16', '11~20', '반차', '본사', '교육'];
+
+            employees.forEach(emp => {
+                let consecutive = 0;
+                for (let d = 1; d <= daysInMonth; d++) {
+                    let dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    let state = (scheduleData[dateStr] && scheduleData[dateStr][emp.name]) ? scheduleData[dateStr][emp.name] : '';
+
+                    if (workingStatuses.includes(state) || state === '') {
+                        consecutive++;
+                        if (consecutive >= 5) {
+                            if (!warnings.includes(emp.name)) warnings.push(emp.name);
+                        }
+                    } else if (['휴무', '필수휴무', '연차', '공가'].includes(state)) {
+                        consecutive = 0;
+                    }
+                }
+            });
+            const warnDiv = document.getElementById('warningMsg');
+            warnDiv.innerHTML = warnings.length > 0 ? `⚠️ [알림] ${warnings.join(', ')} 인원이 최대 5일 연속 근무 규정을 초과할 위험이 있습니다.` : '';
+        }
+
+        function getYearMonthKey(year, month) {
+            return `${year}-${String(month).padStart(2, '0')}`;
+        }
+
+        // 저장된 선택값이 없을 때 보여줄 기본값 (주말+공휴일 수를 세되, 8~15 범위로 보정)
+        function getDefaultQuota(year, month, daysInMonth) {
+            let count = 0;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayIdx = new Date(year, month - 1, d).getDay();
+                const holidayName = getHolidayName(year, month, d);
+                if (dayIdx === 0 || dayIdx === 6 || holidayName) count++;
+            }
+            return Math.min(15, Math.max(8, count));
+        }
+
+        function getTargetOffDays(year, month, daysInMonth) {
+            const key = getYearMonthKey(year, month);
+            const saved = monthlyQuotas[key];
+            if (saved !== undefined && saved !== null && saved !== '') {
+                return Number(saved);
+            }
+            return getDefaultQuota(year, month, daysInMonth);
+        }
+
+        function onQuotaChange() {
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const key = getYearMonthKey(year, month);
+            const value = parseInt(document.getElementById('quotaSelect').value);
+
+            monthlyQuotas[key] = value;
+            saveMonthlyQuota(key, value);
+
+            updateSummary(year, month, daysInMonth);
+        }
+
+        function updateSummary(year, month, daysInMonth) {
+            const targetOffDays = getTargetOffDays(year, month, daysInMonth);
+
+            const quotaSelect = document.getElementById('quotaSelect');
+            if (quotaSelect) quotaSelect.value = targetOffDays;
+
+            const summaryBody = document.getElementById('summaryBody');
+            summaryBody.innerHTML = '';
+
+            employees.forEach(emp => {
+                let usedOffDays = 0;
+                for (let d = 1; d <= daysInMonth; d++) {
+                    let dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    let state = (scheduleData[dateStr] && scheduleData[dateStr][emp.name]) ? scheduleData[dateStr][emp.name] : '';
+                    if (state === '휴무' || state === '필수휴무') usedOffDays++;
+                }
+
+                let remaining = targetOffDays - usedOffDays;
+                let statusText = remaining < 0 ? `초과 (${Math.abs(remaining)}개)` : (remaining === 0 ? '완료' : '-');
+                let statusClass = remaining < 0 ? 'over-limit' : (remaining === 0 ? 'perfect' : 'under-limit');
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td style="font-weight: 600;">${emp.name}</td><td>${usedOffDays}</td><td>${remaining}</td><td class="${statusClass}">${statusText}</td>`;
+                summaryBody.appendChild(tr);
+            });
+        }
+
+        function renderCalendar(year, month, daysInMonth) {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            const firstDay = new Date(year, month - 1, 1).getDay();
+
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'day-cell';
+                emptyCell.style.backgroundColor = 'transparent';
+                emptyCell.style.border = '1px dashed #e5e7eb';
+                grid.appendChild(emptyCell);
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const cell = document.createElement('div');
+                cell.className = 'day-cell';
+                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dayIdx = new Date(year, month - 1, d).getDay();
+                const holidayName = getHolidayName(year, month, d);
+
+                let dateClass = (dayIdx === 0 || holidayName) ? 'sun holiday' : (dayIdx === 6 ? 'sat' : '');
+                let holiText = holidayName ? `<span style="font-size:11px; float:left;">${holidayName}</span>` : '';
+
+                cell.innerHTML = `<div class="date-label ${dateClass}">${holiText}${d}</div>`;
+                const empList = document.createElement('div');
+                empList.className = 'emp-list';
+
+                employees.forEach(emp => {
+                    let state = (scheduleData[dateStr] && scheduleData[dateStr][emp.name]) ? scheduleData[dateStr][emp.name] : '';
+                    let displayState = state === '' ? '미지정' : state;
+
+                    const item = document.createElement('div');
+                    item.className = `emp-item ${getStatusClass(state)}`;
+                    item.innerHTML = `<span>${emp.name}</span><span class="status-text">${displayState}</span>`;
+                    item.onclick = () => cycleStatus(dateStr, emp.name, emp.type);
+                    empList.appendChild(item);
+                });
+
+                cell.appendChild(empList);
+                grid.appendChild(cell);
+            }
+        }
+
+        function renderExcel(year, month, daysInMonth) {
+            const thead = document.getElementById('excelThead');
+            const tbody = document.getElementById('excelTbody');
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            const titleRow = document.createElement('tr');
+            titleRow.innerHTML = `<th colspan="${daysInMonth + 2}" class="excel-title">■ ${year}년 ${month}월 근무 계획</th>`;
+            thead.appendChild(titleRow);
+
+            const dateRow = document.createElement('tr');
+            dateRow.innerHTML = `<th rowspan="2">직급</th><th rowspan="2">성명</th>`;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayIdx = new Date(year, month - 1, d).getDay();
+                const holidayName = getHolidayName(year, month, d);
+                let color = (dayIdx === 0 || holidayName) ? 'red' : (dayIdx === 6 ? 'blue' : 'black');
+                dateRow.innerHTML += `<th style="color:${color};">${d}</th>`;
+            }
+            thead.appendChild(dateRow);
+
+            const dayRow = document.createElement('tr');
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayIdx = new Date(year, month - 1, d).getDay();
+                const holidayName = getHolidayName(year, month, d);
+                let color = (dayIdx === 0 || holidayName) ? 'red' : (dayIdx === 6 ? 'blue' : 'black');
+                dayRow.innerHTML += `<th style="color:${color};">${weekdaysKr[dayIdx]}</th>`;
+            }
+            thead.appendChild(dayRow);
+
+            employees.forEach(emp => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td class="name-col">${emp.title}</td><td class="name-col">${emp.name}</td>`;
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const state = (scheduleData[dateStr] && scheduleData[dateStr][emp.name]) ? scheduleData[dateStr][emp.name] : '';
+                    const shortVal = shortStatuses[state] !== undefined ? shortStatuses[state] : state;
+
+                    let bgColor = '';
+                    let fontColor = '#333';
+                    if (state === '휴무') { bgColor = '#fdeef0'; fontColor = '#d1273f'; }
+                    else if (state === '필수휴무') { bgColor = '#fbdfe3'; fontColor = '#b3122b'; }
+                    else if (state === '연차') { bgColor = '#eaf9ee'; fontColor = '#157a37'; }
+                    else if (state === '반차') { bgColor = '#f0edfd'; fontColor = '#5b3dc7'; }
+                    else if (state === '본사') { bgColor = '#f8eefc'; fontColor = '#8f2bb0'; }
+                    else if (state === '교육') { bgColor = '#fff4e8'; fontColor = '#c06400'; }
+                    else if (state === '공가') { bgColor = '#e8f7f5'; fontColor = '#0d766a'; }
+                    else if (['조출', '09~19', '마감', '07~16', '11~20'].includes(state)) { bgColor = '#eef4ff'; fontColor = '#1d4ed8'; }
+
+                    tr.innerHTML += `<td style="background-color:${bgColor}; color:${fontColor}; font-weight:600;">${shortVal}</td>`;
+                }
+                tbody.appendChild(tr);
+            });
+        }
+
+        function downloadExcel() {
+            const year = document.getElementById('yearSelect').value;
+            const month = document.getElementById('monthSelect').value;
+            const filename = `${year}년_${month}월_매장근무표.xls`;
+
+            let tab_text = '<html xmlns:x="urn:schemas-microsoft-com:office:excel">';
+            tab_text += '<head><meta charset="utf-8"><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>';
+            tab_text += '<x:Name>근무표</x:Name>';
+            tab_text += '<x:WorksheetOptions><x:Panes></x:Panes></x:WorksheetOptions></x:ExcelWorksheet>';
+            tab_text += '</x:ExcelWorksheets></x:ExcelWorkbook></xml></head><body>';
+
+            tab_text += "<table border='1px'>";
+            tab_text += document.getElementById('excelTable').innerHTML;
+            tab_text += '</table></body></html>';
+
+            const blob = new Blob([tab_text], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 화면의 onclick="..." 버튼들이 모듈 안의 함수를 찾을 수 있도록 연결
+        Object.assign(window, {
+            renderAll, refreshFromServer, toggleView, downloadExcel, resetData,
+            changeMode, onQuotaChange, triggerHeaderImageChange, onHeaderImageSelected,
+            closeLoginModal, confirmLoginModal, adminLogout
+        });
+
+        init();
+    </script>
+</body>
+</html>

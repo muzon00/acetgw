@@ -233,6 +233,17 @@
   .login-links { display: flex; gap: 8px; margin-top: 10px; }
   .login-links a { flex: 1; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--sub); text-decoration: none; border: 1px solid var(--line); border-radius: 20px; padding: 8px; }
 
+  /* ===== 근무 데이터 가져오기 ===== */
+  .import-summary { cursor: pointer; font-size: 14.5px; font-weight: 800; }
+  .import-help { font-size: 12.5px; color: var(--sub); line-height: 1.6; margin: 12px 0 8px; }
+  .import-help code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+  #importText {
+    width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 12.5px;
+    font-family: Consolas, "Courier New", monospace; background: #fafafc; resize: vertical;
+  }
+  .import-preview { font-size: 12.5px; margin-top: 8px; line-height: 1.6; }
+  .import-preview .ok { color: var(--green); font-weight: 700; }
+
   .toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); opacity: 0;
     background: #111318; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 600;
@@ -323,6 +334,22 @@
     </section>
   </div>
 
+  <section class="card">
+    <details id="importBox">
+      <summary class="import-summary">근무 데이터 가져오기 (엑셀·시트에서 붙여넣기)</summary>
+      <p class="import-help">
+        엑셀이나 구글 시트에서 <b>날짜 · 성명 · 직급 · 상태</b> 열을 복사해 붙여넣으세요. 첫 줄 제목은 있어도 됩니다.<br>
+        예: <code>2026-09-01	신호철	과장	09~19</code> — 같은 날짜·같은 직원 값은 덮어쓰고, 표에 없는 칸은 그대로 둡니다.
+      </p>
+      <textarea id="importText" rows="8" placeholder="날짜	성명	직급	상태&#10;2026-09-01	신호철	과장	09~19&#10;2026-09-01	박진형	사원	휴무"></textarea>
+      <div class="import-preview" id="importPreview"></div>
+      <div class="toolbar" style="margin-top:10px;">
+        <button type="button" class="btn red" id="importBtn" disabled>가져오기</button>
+        <button type="button" class="btn" id="importClear">지우기</button>
+      </div>
+    </details>
+  </section>
+
   <!-- ===================== 퀵 배차 ===================== -->
   <div class="red-zone">
     <div class="zone-title red"><span class="tag">T1</span>퀵 배차요청 <a href="../t1/">배차요청서 작성 →</a></div>
@@ -371,7 +398,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
-    getFirestore, collection, doc, onSnapshot, query, where, orderBy, limit, Timestamp
+    getFirestore, collection, doc, onSnapshot, query, where, orderBy, limit, Timestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
     getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -969,6 +996,83 @@
   $('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
   $('logoutBtn').addEventListener('click', async () => {
     try { await signOut(auth); } catch (err) { console.error('로그아웃', err); }
+  });
+
+  // ====================================================
+  // 근무 데이터 가져오기 (날짜 / 성명 / 직급 / 상태 붙여넣기)
+  // ====================================================
+  const ALL_STATUSES = ['휴무', '필수휴무', '연차', '반차', '본사', '교육', '공가'].concat(SHIFT_STATUSES);
+
+  function parseImport(text) {
+    const byDate = {};      // { 'YYYY-MM-DD': { 직원id: 상태 } }
+    const problems = [];
+    let count = 0;
+    text.split(/\r?\n/).forEach((raw, i) => {
+      const line = raw.trim();
+      if (!line) return;
+      const cols = line.split(/\t|\s{2,}|,/).map(s => s.trim()).filter(Boolean);
+      const dm = (cols[0] || '').match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})\.?$/);
+      if (!dm) {
+        if (i > 0 || !/날짜/.test(line)) problems.push(`${i + 1}줄: 날짜를 읽을 수 없음 (${line})`);
+        return;
+      }
+      const date = dateKey(+dm[1], +dm[2], +dm[3]);
+      const name = cols[1] || '';
+      const status = cols[cols.length - 1] || '';
+      const member = roster.find(m => m.name === name);
+      if (!member) { problems.push(`${i + 1}줄: 명단에 없는 이름 "${name}"`); return; }
+      if (!ALL_STATUSES.includes(status)) { problems.push(`${i + 1}줄: 알 수 없는 상태 "${status}"`); return; }
+      if (!byDate[date]) byDate[date] = {};
+      byDate[date][member.id] = status;
+      count++;
+    });
+    return { byDate, problems, count };
+  }
+
+  function renderImportPreview() {
+    const { byDate, problems, count } = parseImport($('importText').value);
+    const dates = Object.keys(byDate).sort();
+    let html = '';
+    if (count) {
+      html += `<div class="ok">✓ ${count}건 · ${dates.length}일 (${dates[0]} ~ ${dates[dates.length - 1]})</div>`;
+      const overwrite = dates.reduce((n, d) => n + Object.keys(byDate[d]).filter(id => scheduleData[d] && scheduleData[d][id]).length, 0);
+      if (overwrite) html += `<div class="muted">이미 입력된 칸 ${overwrite}개는 덮어씁니다.</div>`;
+    }
+    if (problems.length) {
+      html += `<div class="err" style="margin-top:6px;">건너뛸 줄 ${problems.length}개<br>${problems.slice(0, 8).map(escapeHtml).join('<br>')}${problems.length > 8 ? '<br>…' : ''}</div>`;
+    }
+    $('importPreview').innerHTML = html;
+    $('importBtn').disabled = !count;
+  }
+
+  $('importText').addEventListener('input', renderImportPreview);
+  $('importClear').addEventListener('click', () => { $('importText').value = ''; renderImportPreview(); });
+  $('importBtn').addEventListener('click', async () => {
+    const { byDate, count } = parseImport($('importText').value);
+    const dates = Object.keys(byDate).sort();
+    if (!count) return;
+    if (!confirm(`${count}건(${dates.length}일)을 근무표에 저장할까요?`)) return;
+    const btn = $('importBtn');
+    btn.disabled = true; btn.textContent = '저장 중...';
+    try {
+      // 한 번에 최대 500개 문서까지 묶어서 저장
+      for (let i = 0; i < dates.length; i += 400) {
+        const batch = writeBatch(db);
+        dates.slice(i, i + 400).forEach(d => batch.set(doc(db, 'schedule', d), byDate[d], { merge: true }));
+        await batch.commit();
+      }
+      toast(`${count}건 저장했습니다`);
+      $('importText').value = '';
+      renderImportPreview();
+      const [y, m] = dates[0].split('-').map(Number);
+      setMonth(y, m);
+    } catch (err) {
+      console.error('import', err);
+      alert('가져오기에 실패했습니다.\n' + friendlyError(err));
+    } finally {
+      btn.textContent = '가져오기';
+      btn.disabled = !parseImport($('importText').value).count;
+    }
   });
 
   onAuthStateChanged(auth, user => {

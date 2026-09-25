@@ -117,6 +117,14 @@
         }
         .modal-error { color: var(--danger); font-size: 12px; margin-top: 8px; display: none; }
         .modal-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+        .modal-box.wide { width: min(980px, 100%); max-height: calc(100vh - 40px); overflow: auto; }
+        .roster-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .roster-table th { color: var(--text-sub); font-weight: 600; text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .roster-table td { padding: 4px; border-bottom: 1px solid #f0f0f2; }
+        .roster-table input, .roster-table select { width: 100%; padding: 6px; font-size: 13px; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; }
+        .roster-table .col-actions { white-space: nowrap; }
+        .roster-table .col-actions button { padding: 4px 8px; font-size: 12px; }
+        .roster-hint { font-size: 12px; color: var(--text-sub); margin: 8px 0 0; line-height: 1.5; }
 
         h1 {
             text-align: center;
@@ -392,16 +400,16 @@
 
     <div id="adminBar" style="display:none; text-align:center; margin-bottom:16px; font-size:13px; color:var(--text-sub);">
         관리자로 로그인됨: <strong id="adminEmailLabel"></strong>
+        <button type="button" class="btn-neutral" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="openRosterModal()">직원 관리</button>
         <button type="button" class="btn-neutral" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="adminLogout()">로그아웃</button>
     </div>
 
     <div class="controls">
         <select id="yearSelect" onchange="renderAll()"></select>
         <select id="monthSelect" onchange="renderAll()"></select>
-        <button class="btn-primary" onclick="renderAll()">날짜 이동</button>
         <button class="btn-refresh" onclick="refreshFromServer()">새로고침</button>
         <button class="btn-neutral" id="toggleBtn" onclick="toggleView()">엑셀 양식으로 보기</button>
-        <button class="btn-excel" onclick="downloadExcel()">엑셀 파일(.xls) 다운로드</button>
+        <button class="btn-excel" onclick="downloadExcel()">엑셀 파일(.xlsx) 다운로드</button>
         <button class="btn-reset" onclick="resetData()">전체 초기화</button>
         <button class="btn-neutral" onclick="window.print()">인쇄</button>
     </div>
@@ -448,15 +456,47 @@
     <div id="loginModal" class="modal-overlay" style="display:none;">
         <div class="modal-box">
             <h3 id="modalTitle">관리자 로그인</h3>
-            <p id="modalDesc">관리자 이메일과 비밀번호를 입력하세요.</p>
-            <input type="email" id="modalEmailInput" placeholder="admin@example.com" autocomplete="username"
-                   style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:14px; margin-bottom:8px;">
-            <input type="password" id="modalPasswordInput" placeholder="비밀번호" autocomplete="current-password"
-                   style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); font-family:inherit; font-size:14px;">
+            <p id="modalDesc">관리자 비밀번호(숫자 6자리)를 입력하세요.</p>
+            <input type="password" id="modalPasswordInput" class="modal-input" placeholder="······"
+                   inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password"
+                   onkeydown="if (event.key === 'Enter') confirmLoginModal()">
             <div id="modalError" class="modal-error"></div>
             <div class="modal-actions">
                 <button type="button" class="btn-neutral" onclick="closeLoginModal()">취소</button>
                 <button type="button" class="btn-primary" onclick="confirmLoginModal()">로그인</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="rosterModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box wide">
+            <h3>직원 관리</h3>
+            <p>엑셀 근무표에 나오는 순서대로 정렬됩니다. 점장은 맨 위 줄, 나머지는 '매장운영' 아래에 표시됩니다.</p>
+            <table class="roster-table">
+                <thead>
+                    <tr>
+                        <th style="width:90px;">구분</th>
+                        <th style="width:80px;">직급</th>
+                        <th style="width:100px;">성명</th>
+                        <th style="width:80px;">유형</th>
+                        <th style="width:140px;">입사일</th>
+                        <th style="width:140px;">퇴사일</th>
+                        <th>메모(엑셀 구분칸)</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="rosterBody"></tbody>
+            </table>
+            <button type="button" class="btn-neutral" style="margin-top:10px;" onclick="addRosterRow()">+ 직원 추가</button>
+            <p class="roster-hint">
+                · 퇴사한 직원은 삭제하지 말고 <strong>퇴사일</strong>을 넣어주세요. 퇴사일 다음 날부터 근무표에서 빠지고, 엑셀에는 '퇴 사'로 표시됩니다.<br>
+                · 삭제하면 그 직원의 지난 근무 기록도 화면과 엑셀에서 보이지 않게 됩니다.<br>
+                · 유형이 AR이면 관리자 배정 시 AR 근무시간(07~16, 11~20)이 적용됩니다.
+            </p>
+            <div id="rosterError" class="modal-error"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn-neutral" onclick="closeRosterModal()">취소</button>
+                <button type="button" class="btn-primary" onclick="saveRosterFromModal()">저장</button>
             </div>
         </div>
     </div>
@@ -491,38 +531,65 @@
 
         // ====================================================
         // 2) 파이어스토어 저장 구조
-        //    schedule/{날짜}          예: schedule/2026-10-05  -> { 홍길동: "휴무", ... }
+        //    schedule/{날짜}          예: schedule/2026-10-05  -> { e1: "휴무", ... }  (키는 직원 id)
         //    settings/main            -> { headerImageUrl: "..." }
         //    settings/monthlyQuotas   -> { "2026-10": 10, ... }
+        //    settings/roster          -> { members: [{ id, name, title, type, role, start, end, note }], ids: [...] }
         //    meta/lastChange          -> 실시간 알림용 마지막 변경 정보
         //
-        //    관리자 계정은 비밀번호가 아니라 Firebase 인증(이메일/비밀번호)으로 관리됩니다.
-        //    Firebase 콘솔 > Authentication > Users 에서 관리자 계정을 직접 추가해주세요.
-        //    거기에 등록된 이메일로 로그인하면 관리자로 인정됩니다.
+        //    관리자 로그인은 숫자 6자리 비밀번호만 입력받고, 아래 ADMIN_EMAIL 계정으로
+        //    Firebase 인증(이메일/비밀번호)에 로그인합니다.
+        //    비밀번호는 Firebase 콘솔 > Authentication > Users 에서 이 이메일 계정에 설정합니다.
         // ====================================================
+        const ADMIN_EMAIL = 'muzon00@gmail.com';
         let currentUser = null;
         let isAdmin = false;
 
-        const employees = [
-            { title: '과장', name: '신호철', type: 'general' },
-            { title: '과장', name: '김종현', type: 'general' },
-            { title: '대리', name: '손충현', type: 'general' },
-            { title: '계장', name: '김진우', type: 'general' },
-            { title: '사원', name: '김범기', type: 'general' },
-            { title: '사원', name: '박진형', type: 'general' },
-            { title: '사원', name: '임은구', type: 'general' },
-            { title: 'AR', name: 'AR', type: 'ar' }
+        const STORE_NAME = '퇴계원점';
+
+        // 직원 명단: Firestore settings/roster 에 저장 (관리자 > 직원 관리 에서 편집)
+        // 문서가 아직 없을 때 쓰는 기본 명단 (id 는 firestore.rules 의 기본 id 목록과 같아야 함)
+        // role: 'manager' = 점장 줄, 'staff' = 매장운영 / type: 'general' | 'ar'
+        // start, end: 'YYYY-MM-DD' (비워두면 제한 없음)
+        const DEFAULT_ROSTER = [
+            { id: 'e1', title: '과장', name: '신호철', type: 'general', role: 'manager', start: '', end: '', note: '' },
+            { id: 'e2', title: '과장', name: '김종현', type: 'general', role: 'staff', start: '', end: '', note: '' },
+            { id: 'e3', title: '대리', name: '손충현', type: 'general', role: 'staff', start: '', end: '', note: '' },
+            { id: 'e4', title: '계장', name: '김진우', type: 'general', role: 'staff', start: '', end: '', note: '' },
+            { id: 'e5', title: '사원', name: '김범기', type: 'general', role: 'staff', start: '', end: '', note: '' },
+            { id: 'e6', title: '사원', name: '박진형', type: 'general', role: 'staff', start: '', end: '', note: '' },
+            { id: 'e7', title: '사원', name: '임은구', type: 'general', role: 'staff', start: '', end: '', note: '' },
+            { id: 'e8', title: 'AR', name: 'AR', type: 'ar', role: 'staff', start: '', end: '', note: '' }
         ];
+        let roster = DEFAULT_ROSTER.map(m => ({ ...m }));
+        let rosterDocExists = false;
+        let rosterLoaded = false;
+
+        function dateKey(year, month, day) {
+            return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+
+        function isActiveOn(member, dateStr) {
+            if (member.start && dateStr < member.start) return false;
+            if (member.end && dateStr > member.end) return false;
+            return true;
+        }
+
+        // 해당 월에 하루라도 재직한 직원 (점장 먼저, 그다음 명단 순서)
+        function membersForMonth(year, month, daysInMonth) {
+            const first = dateKey(year, month, 1);
+            const last = dateKey(year, month, daysInMonth);
+            const inMonth = roster.filter(m => (!m.start || m.start <= last) && (!m.end || m.end >= first));
+            return inMonth.filter(m => m.role === 'manager').concat(inMonth.filter(m => m.role !== 'manager'));
+        }
+
+        function getStatus(dateStr, member) {
+            return (scheduleData[dateStr] && scheduleData[dateStr][member.id]) || '';
+        }
 
         const cycleEmp = ['', '휴무', '필수휴무', '연차', '반차', '본사', '교육', '공가'];
         const cycleMgrGeneral = ['', '조출', '09~19', '마감'];
         const cycleMgrAR = ['', '07~16', '11~20'];
-
-        const shortStatuses = {
-            '조출': '조출', '07~17': '조출', '09~19': '09~19', '마감': '마감', '10~20': '10~20',
-            '07~16': '07~16', '11~20': '11~20',
-            '휴무': '휴', '필수휴무': '필휴', '연차': '연', '반차': '반', '본사': '본', '교육': '교', '공가': '공', '': ''
-        };
 
         let monthlyQuotas = {};
         let settings = {};
@@ -562,6 +629,12 @@
             return null;
         }
 
+        function escapeHtml(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, ch => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+            ));
+        }
+
         function reportError(action, err) {
             console.error(action, err);
             alert(action + ' 중 오류가 발생했습니다.\n' + (err && err.message ? err.message : err));
@@ -586,10 +659,10 @@
         }
 
         // 한 사람의 하루 상태 저장 (해당 날짜 문서 하나만 갱신)
-        async function saveDayStatus(dateStr, name, status) {
+        async function saveDayStatus(dateStr, member, status) {
             try {
-                await setDoc(doc(db, 'schedule', dateStr), { [name]: status }, { merge: true });
-                await recordChange({ date: dateStr, name: name, status: status, action: 'update' });
+                await setDoc(doc(db, 'schedule', dateStr), { [member.id]: status }, { merge: true });
+                await recordChange({ date: dateStr, name: member.name, status: status, action: 'update' });
             } catch (err) {
                 reportError('저장', err);
             }
@@ -605,24 +678,55 @@
         }
 
         async function loadAllOnce() {
-            const [schedSnap, settingsSnap, quotaSnap] = await Promise.all([
+            const [schedSnap, settingsSnap, quotaSnap, rosterSnap] = await Promise.all([
                 getDocs(collection(db, 'schedule')),
                 getDoc(doc(db, 'settings', 'main')),
-                getDoc(doc(db, 'settings', 'monthlyQuotas'))
+                getDoc(doc(db, 'settings', 'monthlyQuotas')),
+                getDoc(doc(db, 'settings', 'roster'))
             ]);
             const data = {};
             schedSnap.forEach(d => { data[d.id] = d.data(); });
             scheduleData = data;
             settings = settingsSnap.exists() ? settingsSnap.data() : {};
             monthlyQuotas = quotaSnap.exists() ? quotaSnap.data() : {};
+            applyRosterSnapshot(rosterSnap);
+        }
+
+        // 명단 문서가 아직 없으면 관리자 로그인 시 기본 명단을 저장해 둠
+        // (서버에서 명단을 받아온 뒤에만 판단해야 기존 명단을 덮어쓰지 않음)
+        function maybeSeedRoster() {
+            if (!isAdmin || !rosterLoaded || rosterDocExists) return;
+            rosterDocExists = true;
+            saveRoster(roster).catch(err => {
+                rosterDocExists = false;
+                console.error('roster seed', err);
+            });
+        }
+
+        function applyRosterSnapshot(snap) {
+            if (!snap.metadata.fromCache) rosterLoaded = true;
+            rosterDocExists = snap.exists();
+            const members = rosterDocExists ? snap.data().members : null;
+            roster = Array.isArray(members) && members.length ? members : DEFAULT_ROSTER.map(m => ({ ...m }));
+        }
+
+        async function saveRoster(members) {
+            const clean = members.map(m => ({
+                id: m.id, title: m.title, name: m.name,
+                type: m.type === 'ar' ? 'ar' : 'general',
+                role: m.role === 'manager' ? 'manager' : 'staff',
+                start: m.start || '', end: m.end || '', note: m.note || ''
+            }));
+            await setDoc(doc(db, 'settings', 'roster'), { members: clean, ids: clean.map(m => m.id) });
         }
 
         // ====== Firebase 인증 (관리자 로그인) ======
         function watchAuthState() {
             onAuthStateChanged(auth, (user) => {
                 currentUser = user;
-                isAdmin = !!user;
+                isAdmin = !!user && user.email === ADMIN_EMAIL;
                 updateAdminBar();
+                maybeSeedRoster();
                 if (!isAdmin && currentMode === 'manager') {
                     // 로그아웃되면 관리자 모드에서 자동으로 나감
                     applyModeChange('employee');
@@ -641,8 +745,8 @@
             }
         }
 
-        async function loginAdmin(email, password) {
-            const cred = await signInWithEmailAndPassword(auth, email, password);
+        async function loginAdmin(password) {
+            const cred = await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
             return cred.user;
         }
 
@@ -713,6 +817,13 @@
                 applySettings();
             }, (err) => console.error('settings listener', err));
 
+            // 직원 명단
+            onSnapshot(doc(db, 'settings', 'roster'), (snap) => {
+                applyRosterSnapshot(snap);
+                maybeSeedRoster();
+                renderAll();
+            }, (err) => console.error('roster listener', err));
+
             // 월별 휴무 목표일수
             onSnapshot(doc(db, 'settings', 'monthlyQuotas'), (snap) => {
                 monthlyQuotas = snap.exists() ? snap.data() : {};
@@ -764,17 +875,21 @@
             const toast = document.createElement('div');
             toast.className = 'toast' + (info.action === 'reset' ? ' reset' : '');
 
+            const date = escapeHtml(info.date);
+            const status = escapeHtml(info.status);
             let msg;
             if (info.action === 'reset') {
                 msg = `<strong>근무표 전체 초기화</strong>가 발생했습니다.`;
             } else if (info.action === 'quota') {
-                msg = `<strong>${info.date}</strong> 월의 휴무 목표일수가 <strong>${info.status}</strong>(으)로 변경되었습니다.`;
+                msg = `<strong>${date}</strong> 월의 휴무 목표일수가 <strong>${status}</strong>(으)로 변경되었습니다.`;
             } else if (info.action === 'header_image') {
                 msg = `헤더 이미지가 변경되었습니다.`;
+            } else if (info.action === 'roster') {
+                msg = `<strong>직원 명단</strong>이 변경되었습니다.`;
             } else if (info.name) {
-                const dateLabel = info.date ? `${info.date} ` : '';
-                const statusLabel = info.status ? info.status : '미지정';
-                msg = `<strong>${info.name}</strong>님이 ${dateLabel}근무 정보를 <strong>${statusLabel}</strong>(으)로 변경했습니다.`;
+                const dateLabel = date ? `${date} ` : '';
+                const statusLabel = status ? status : '미지정';
+                msg = `<strong>${escapeHtml(info.name)}</strong>님의 ${dateLabel}근무 정보가 <strong>${statusLabel}</strong>(으)로 변경되었습니다.`;
             } else {
                 msg = `새로운 근무 데이터가 입력되었습니다.`;
             }
@@ -876,22 +991,21 @@
             const errorDiv = document.getElementById('modalError');
             errorDiv.style.display = 'none';
             errorDiv.textContent = '';
-            document.getElementById('modalEmailInput').value = '';
             document.getElementById('modalPasswordInput').value = '';
 
             if (context === 'manager') {
                 document.getElementById('modalTitle').textContent = '관리자 모드 전환';
-                document.getElementById('modalDesc').textContent = '관리자 근무 배정 모드로 전환하려면 관리자 계정으로 로그인하세요.';
+                document.getElementById('modalDesc').textContent = '관리자 근무 배정 모드로 전환하려면 관리자 비밀번호(숫자 6자리)를 입력하세요.';
             } else if (context === 'header_image') {
                 document.getElementById('modalTitle').textContent = '헤더 이미지 변경';
-                document.getElementById('modalDesc').textContent = '이미지를 업로드하려면 관리자 계정으로 로그인하세요.';
+                document.getElementById('modalDesc').textContent = '이미지를 업로드하려면 관리자 비밀번호(숫자 6자리)를 입력하세요.';
             } else if (context === 'reset') {
                 document.getElementById('modalTitle').textContent = '전체 초기화';
-                document.getElementById('modalDesc').textContent = '초기화하려면 관리자 계정으로 로그인하세요.';
+                document.getElementById('modalDesc').textContent = '초기화하려면 관리자 비밀번호(숫자 6자리)를 입력하세요.';
             }
 
             document.getElementById('loginModal').style.display = 'flex';
-            setTimeout(() => document.getElementById('modalEmailInput').focus(), 50);
+            setTimeout(() => document.getElementById('modalPasswordInput').focus(), 50);
         }
 
         function closeLoginModal() {
@@ -903,21 +1017,28 @@
         }
 
         async function confirmLoginModal() {
-            const email = document.getElementById('modalEmailInput').value.trim();
-            const password = document.getElementById('modalPasswordInput').value;
+            const password = document.getElementById('modalPasswordInput').value.trim();
             const errorDiv = document.getElementById('modalError');
 
-            if (!email || !password) {
-                errorDiv.textContent = '이메일과 비밀번호를 모두 입력해주세요.';
+            if (!/^[0-9]{6}$/.test(password)) {
+                errorDiv.textContent = '비밀번호는 숫자 6자리로 입력해주세요.';
                 errorDiv.style.display = 'block';
                 return;
             }
 
             try {
-                await loginAdmin(email, password);
+                await loginAdmin(password);
             } catch (err) {
-                errorDiv.textContent = '로그인 실패: 이메일 또는 비밀번호를 확인해주세요.';
+                const code = err && err.code;
+                if (code === 'auth/too-many-requests') {
+                    errorDiv.textContent = '시도 횟수가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+                } else if (code === 'auth/network-request-failed') {
+                    errorDiv.textContent = '인터넷 연결을 확인해주세요.';
+                } else {
+                    errorDiv.textContent = '비밀번호가 올바르지 않습니다.';
+                }
                 errorDiv.style.display = 'block';
+                document.getElementById('modalPasswordInput').select();
                 return;
             }
 
@@ -1031,15 +1152,20 @@
             return 'status-unassigned';
         }
 
-        function cycleStatus(dateStr, empName, empType) {
+        function cycleStatus(dateStr, member) {
             if (!scheduleData[dateStr]) scheduleData[dateStr] = {};
-            let current = scheduleData[dateStr][empName] || '';
+            const key = member.id;
+            let current = scheduleData[dateStr][key] || '';
 
             if (currentMode === 'employee') {
+                if (current !== '' && !cycleEmp.includes(current)) {
+                    alert(`관리자가 이미 [${current}] 근무를 배정한 날입니다.\n변경이 필요하면 관리자에게 요청해 주세요.`);
+                    return;
+                }
                 let idx = cycleEmp.indexOf(current);
                 if (idx === -1) idx = 0;
                 let nextIdx = (idx + 1) % cycleEmp.length;
-                scheduleData[dateStr][empName] = cycleEmp[nextIdx];
+                scheduleData[dateStr][key] = cycleEmp[nextIdx];
 
             } else if (currentMode === 'manager') {
                 if (cycleEmp.includes(current) && current !== '') {
@@ -1047,14 +1173,14 @@
                     return;
                 }
 
-                const cycleMgr = (empType === 'ar') ? cycleMgrAR : cycleMgrGeneral;
+                const cycleMgr = (member.type === 'ar') ? cycleMgrAR : cycleMgrGeneral;
                 let idx = cycleMgr.indexOf(current);
                 if (idx === -1) idx = 0;
                 let nextIdx = (idx + 1) % cycleMgr.length;
-                scheduleData[dateStr][empName] = cycleMgr[nextIdx];
+                scheduleData[dateStr][key] = cycleMgr[nextIdx];
             }
 
-            saveDayStatus(dateStr, empName, scheduleData[dateStr][empName]);
+            saveDayStatus(dateStr, member, scheduleData[dateStr][key]);
             renderAll();
         }
 
@@ -1062,11 +1188,12 @@
             let warnings = [];
             const workingStatuses = ['조출', '09~19', '마감', '07~16', '11~20', '반차', '본사', '교육'];
 
-            employees.forEach(emp => {
+            membersForMonth(year, month, daysInMonth).forEach(emp => {
                 let consecutive = 0;
                 for (let d = 1; d <= daysInMonth; d++) {
-                    let dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    let state = (scheduleData[dateStr] && scheduleData[dateStr][emp.name]) ? scheduleData[dateStr][emp.name] : '';
+                    let dateStr = dateKey(year, month, d);
+                    if (!isActiveOn(emp, dateStr)) { consecutive = 0; continue; }
+                    let state = getStatus(dateStr, emp);
 
                     if (workingStatuses.includes(state) || state === '') {
                         consecutive++;
@@ -1128,11 +1255,10 @@
             const summaryBody = document.getElementById('summaryBody');
             summaryBody.innerHTML = '';
 
-            employees.forEach(emp => {
+            membersForMonth(year, month, daysInMonth).forEach(emp => {
                 let usedOffDays = 0;
                 for (let d = 1; d <= daysInMonth; d++) {
-                    let dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    let state = (scheduleData[dateStr] && scheduleData[dateStr][emp.name]) ? scheduleData[dateStr][emp.name] : '';
+                    let state = getStatus(dateKey(year, month, d), emp);
                     if (state === '휴무' || state === '필수휴무') usedOffDays++;
                 }
 
@@ -1141,7 +1267,7 @@
                 let statusClass = remaining < 0 ? 'over-limit' : (remaining === 0 ? 'perfect' : 'under-limit');
 
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td style="font-weight: 600;">${emp.name}</td><td>${usedOffDays}</td><td>${remaining}</td><td class="${statusClass}">${statusText}</td>`;
+                tr.innerHTML = `<td style="font-weight: 600;">${escapeHtml(emp.name)}</td><td>${usedOffDays}</td><td>${remaining}</td><td class="${statusClass}">${statusText}</td>`;
                 summaryBody.appendChild(tr);
             });
         }
@@ -1150,6 +1276,7 @@
             const grid = document.getElementById('calendarGrid');
             grid.innerHTML = '';
             const firstDay = new Date(year, month - 1, 1).getDay();
+            const members = membersForMonth(year, month, daysInMonth);
 
             for (let i = 0; i < firstDay; i++) {
                 const emptyCell = document.createElement('div');
@@ -1162,7 +1289,7 @@
             for (let d = 1; d <= daysInMonth; d++) {
                 const cell = document.createElement('div');
                 cell.className = 'day-cell';
-                const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dateStr = dateKey(year, month, d);
                 const dayIdx = new Date(year, month - 1, d).getDay();
                 const holidayName = getHolidayName(year, month, d);
 
@@ -1173,14 +1300,15 @@
                 const empList = document.createElement('div');
                 empList.className = 'emp-list';
 
-                employees.forEach(emp => {
-                    let state = (scheduleData[dateStr] && scheduleData[dateStr][emp.name]) ? scheduleData[dateStr][emp.name] : '';
+                members.forEach(emp => {
+                    if (!isActiveOn(emp, dateStr)) return; // 입사 전 / 퇴사 후
+                    let state = getStatus(dateStr, emp);
                     let displayState = state === '' ? '미지정' : state;
 
                     const item = document.createElement('div');
                     item.className = `emp-item ${getStatusClass(state)}`;
-                    item.innerHTML = `<span>${emp.name}</span><span class="status-text">${displayState}</span>`;
-                    item.onclick = () => cycleStatus(dateStr, emp.name, emp.type);
+                    item.innerHTML = `<span>${escapeHtml(emp.name)}</span><span class="status-text">${displayState}</span>`;
+                    item.onclick = () => cycleStatus(dateStr, emp);
                     empList.appendChild(item);
                 });
 
@@ -1218,61 +1346,503 @@
             }
             thead.appendChild(dayRow);
 
-            employees.forEach(emp => {
+            membersForMonth(year, month, daysInMonth).forEach(emp => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td class="name-col">${emp.title}</td><td class="name-col">${emp.name}</td>`;
+                tr.innerHTML = `<td class="name-col">${escapeHtml(emp.title)}</td><td class="name-col">${escapeHtml(emp.name)}</td>`;
 
                 for (let d = 1; d <= daysInMonth; d++) {
-                    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                    const state = (scheduleData[dateStr] && scheduleData[dateStr][emp.name]) ? scheduleData[dateStr][emp.name] : '';
-                    const shortVal = shortStatuses[state] !== undefined ? shortStatuses[state] : state;
-
-                    let bgColor = '';
-                    let fontColor = '#333';
-                    if (state === '휴무') { bgColor = '#fdeef0'; fontColor = '#d1273f'; }
-                    else if (state === '필수휴무') { bgColor = '#fbdfe3'; fontColor = '#b3122b'; }
-                    else if (state === '연차') { bgColor = '#eaf9ee'; fontColor = '#157a37'; }
-                    else if (state === '반차') { bgColor = '#f0edfd'; fontColor = '#5b3dc7'; }
-                    else if (state === '본사') { bgColor = '#f8eefc'; fontColor = '#8f2bb0'; }
-                    else if (state === '교육') { bgColor = '#fff4e8'; fontColor = '#c06400'; }
-                    else if (state === '공가') { bgColor = '#e8f7f5'; fontColor = '#0d766a'; }
-                    else if (['조출', '09~19', '마감', '07~16', '11~20'].includes(state)) { bgColor = '#eef4ff'; fontColor = '#1d4ed8'; }
-
-                    tr.innerHTML += `<td style="background-color:${bgColor}; color:${fontColor}; font-weight:600;">${shortVal}</td>`;
+                    const dateStr = dateKey(year, month, d);
+                    if (!isActiveOn(emp, dateStr)) {
+                        tr.innerHTML += `<td style="background-color:#f3f4f6; color:#9ca3af;">-</td>`;
+                        continue;
+                    }
+                    const code = toXlsxCode(getStatus(dateStr, emp));
+                    const look = XLSX_CODE_LOOK[code] || {};
+                    const bgColor = look.fill ? '#' + look.fill.slice(2) : '';
+                    const fontColor = look.font ? '#' + look.font.slice(2) : '#333';
+                    tr.innerHTML += `<td style="background-color:${bgColor}; color:${fontColor}; font-weight:600;">${escapeHtml(code)}</td>`;
                 }
                 tbody.appendChild(tr);
             });
         }
 
-        function downloadExcel() {
-            const year = document.getElementById('yearSelect').value;
-            const month = document.getElementById('monthSelect').value;
-            const filename = `${year}년_${month}월_매장근무표.xls`;
+        // ====================================================
+        // 5) 엑셀(.xlsx) 다운로드 - 매장 근무표 양식
+        // ====================================================
+        // ==== XLSX BUILDER START ====
+        // 웹 상태값 -> 엑셀 칸 표기
+        const XLSX_CODES = {
+            '휴무': '휴', '필수휴무': '휴', '연차': '연', '공가': '경',
+            '반차': '반차', '본사': '본사', '교육': '교육',
+            '조출': '조', '07~16': '조', '09~19': '중', '마감': '마', '11~20': '마'
+        };
+        // 표기별 색 (font: 글자색, fill: 칸 배경색) - 엑셀에서는 조건부 서식으로 적용됨
+        const XLSX_CODE_LOOK = {
+            '휴': { font: 'FFFF0000' }, '연': { font: 'FFFF0000' }, '경': { font: 'FFFF0000' },
+            '반차': { font: 'FF7030A0' }, '본사': { font: 'FF0070C0' }, '교육': { font: 'FF0070C0' },
+            '조': { fill: 'FFFFC000' }, '중': { fill: 'FFBDD7EE' }, '마': { fill: 'FFC6E0B4' }
+        };
+        // 매장 근무인원에서 빠지는 표기
+        const XLSX_ABSENT_CODES = ['휴', '연', '경', '본사', '교육'];
+        const XLSX_SHIFT_LEGEND = [
+            ['07시~17시\n(AR 07~16)', '조'],
+            ['09시~19시', '중'],
+            ['10시~20시\n(AR 11~20)', '마']
+        ];
+        const XLSX_OFF_LEGEND = [
+            ['휴무일', '휴'], ['연차휴가', '연'], ['경조·공가', '경'], ['반차', '반차'], ['본사·교육', '본사/교육']
+        ];
 
-            let tab_text = '<html xmlns:x="urn:schemas-microsoft-com:office:excel">';
-            tab_text += '<head><meta charset="utf-8"><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>';
-            tab_text += '<x:Name>근무표</x:Name>';
-            tab_text += '<x:WorksheetOptions><x:Panes></x:Panes></x:WorksheetOptions></x:ExcelWorksheet>';
-            tab_text += '</x:ExcelWorksheets></x:ExcelWorkbook></xml></head><body>';
+        function toXlsxCode(status) {
+            return XLSX_CODES[status] !== undefined ? XLSX_CODES[status] : (status || '');
+        }
 
-            tab_text += "<table border='1px'>";
-            tab_text += document.getElementById('excelTable').innerHTML;
-            tab_text += '</table></body></html>';
+        function xlsxColName(n) {
+            let s = '';
+            while (n > 0) {
+                const m = (n - 1) % 26;
+                s = String.fromCharCode(65 + m) + s;
+                n = Math.floor((n - 1) / 26);
+            }
+            return s;
+        }
 
-            const blob = new Blob([tab_text], { type: 'application/vnd.ms-excel;charset=utf-8' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+        // model = {
+        //   year, month, quota, storeName,
+        //   days: [{ day, label: '수' | '공', red: bool }],
+        //   managers: [row], staff: [row]
+        // }
+        // row = { title, name, note, codes: [엑셀 표기 (하루 1칸)], from, to }  (from~to: 이 달의 재직 일자)
+        function buildScheduleWorkbook(ExcelJS, model) {
+            const L = xlsxColName;
+            const N = model.days.length;
+            const D1 = 4, DN = 3 + N;                          // 날짜 칸 (D ~)
+            const C_HOL = DN + 1, C_SIGN = DN + 2, C_GAP = DN + 3;
+            const C_TOT = DN + 4, C_OFF = DN + 5, C_ANN = DN + 6, C_CON = DN + 7, C_WKD = DN + 8;
+
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet(`${String(model.year).slice(2)}년${model.month}월`, {
+                views: [{ state: 'frozen', xSplit: 3, ySplit: 5 }],
+                pageSetup: {
+                    paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 1,
+                    margins: { left: 0.25, right: 0.25, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 }
+                }
+            });
+
+            const FONT = { name: '맑은 고딕', size: 9 };
+            const CENTER = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            const THIN = { style: 'thin', color: { argb: 'FF000000' } };
+            const MEDIUM = { style: 'medium', color: { argb: 'FF000000' } };
+
+            // 셀마다 새 style 객체를 만들어서 넣음 (병합 셀끼리 style 이 공유되지 않도록)
+            function put(r, c, value, opts = {}) {
+                const cell = ws.getCell(r, c);
+                if (value !== undefined) cell.value = value;
+                const style = { ...cell.style };
+                style.font = { ...FONT, ...(opts.font || {}) };
+                style.alignment = opts.alignment || CENTER;
+                if (opts.numFmt) style.numFmt = opts.numFmt;
+                if (opts.fill) style.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.fill }, bgColor: { argb: opts.fill } };
+                cell.style = style;
+                return cell;
+            }
+            const merges = [];
+            function merge(r1, c1, r2, c2) { if (r1 !== r2 || c1 !== c2) merges.push([r1, c1, r2, c2]); }
+            const boxes = [];
+            function box(r1, c1, r2, c2, outline) { boxes.push([r1, c1, r2, c2, outline]); }
+
+            // ---- 열 너비 ----
+            ws.getColumn(1).width = 13.75;
+            ws.getColumn(2).width = 6.83;
+            ws.getColumn(3).width = 9;
+            for (let c = D1; c <= DN; c++) ws.getColumn(c).width = 4.25;
+            ws.getColumn(C_HOL).width = 6.75;
+            ws.getColumn(C_SIGN).width = 15.5;
+            ws.getColumn(C_GAP).width = 1;
+            for (let c = C_TOT; c <= C_CON; c++) ws.getColumn(c).width = 7.75;
+            ws.getColumn(C_WKD).width = 11.83;
+
+            // ---- 행 위치 ----
+            const R_HEAD1 = 4, R_HEAD2 = 5;
+            const R_MGR = 6;
+            const R_GROUP = R_MGR + model.managers.length;
+            const R_STAFF = R_GROUP + 1;
+            const R_LAST = R_GROUP + model.staff.length;       // 마지막 직원 줄 (직원이 없으면 = R_GROUP)
+            const R_SUM = R_LAST + 1, R_RATE = R_LAST + 2, R_SUM2 = R_LAST + 3;
+            const R_LEG = R_SUM2 + 2;
+
+            const dayRange = r => `${L(D1)}${r}:${L(DN)}${r}`;
+            const hdrRange = `$${L(D1)}$${R_HEAD2}:$${L(DN)}$${R_HEAD2}`;
+            const nameCells = [];
+            if (model.managers.length) nameCells.push(`C${R_MGR}:C${R_GROUP - 1}`);
+            if (model.staff.length) nameCells.push(`C${R_STAFF}:C${R_LAST}`);
+
+            // ---- 제목 / 총원 / 기준 휴무일 ----
+            const LEFT = { horizontal: 'left', vertical: 'middle' };
+            put(1, 1, `■ ${model.year}년 ${model.month}월 근무 계획`, { font: { size: 12, bold: true }, alignment: LEFT });
+            ws.getRow(1).height = 21;
+            put(2, 1, '총원', { font: { bold: true } });
+            put(2, 2, nameCells.length ? { formula: `COUNTA(${nameCells.join(',')})` } : 0, { font: { bold: true }, numFmt: '0"명"' });
+            put(3, 1, '기준 휴무일', { font: { bold: true } });
+            put(3, 2, Number(model.quota), { font: { bold: true }, numFmt: '0"일"' });
+            put(3, C_SIGN, `[ ${model.storeName} ]`, { font: { size: 10, bold: true } });
+            ws.getRow(3).height = 18;
+
+            // ---- 머리글 (4~5행) ----
+            const BOLD = { bold: true };
+            put(R_HEAD1, 1, '구분', { font: BOLD }); merge(R_HEAD1, 1, R_HEAD2, 1);
+            put(R_HEAD1, 2, '직급', { font: BOLD }); merge(R_HEAD1, 2, R_HEAD2, 2);
+            put(R_HEAD1, 3, '성명', { font: BOLD }); merge(R_HEAD1, 3, R_HEAD2, 3);
+            model.days.forEach((d, i) => {
+                put(R_HEAD1, D1 + i, d.day, { font: BOLD });
+                put(R_HEAD2, D1 + i, d.label, { font: d.red ? { bold: true, color: { argb: 'FFFF0000' } } : BOLD });
+            });
+            put(R_HEAD1, C_HOL, '휴일\n근무', { font: BOLD }); merge(R_HEAD1, C_HOL, R_HEAD2, C_HOL);
+            put(R_HEAD1, C_SIGN, '본인\n서명'); merge(R_HEAD1, C_SIGN, R_HEAD2, C_SIGN);
+            put(R_HEAD1, C_TOT, '휴무구분', { font: BOLD }); merge(R_HEAD1, C_TOT, R_HEAD1, C_CON);
+            put(R_HEAD2, C_TOT, '계', { font: BOLD });
+            put(R_HEAD2, C_OFF, '기준휴무', { font: { size: 8 } });
+            put(R_HEAD2, C_ANN, '연차');
+            put(R_HEAD2, C_CON, '경조');
+            put(R_HEAD1, C_WKD, '주말/공휴일\n휴무일수', { font: BOLD }); merge(R_HEAD1, C_WKD, R_HEAD2, C_WKD);
+
+            // ---- 직원 한 줄 ----
+            function writeMember(r, row, divisionText) {
+                ws.getRow(r).height = 23.25;
+                put(r, 1, divisionText || '', { font: { size: 8 } });
+                put(r, 2, row.title);
+                put(r, 3, row.name);
+                for (let i = 0; i < N; i++) {
+                    const day = i + 1;
+                    const inRange = day >= row.from && day <= row.to;
+                    put(r, D1 + i, inRange ? (row.codes[i] || null) : null, { font: BOLD });
+                }
+                if (row.from > 1) {
+                    put(r, D1, '입 사 전', { font: BOLD });
+                    merge(r, D1, r, D1 + row.from - 2);
+                }
+                if (row.to < N) {
+                    put(r, D1 + row.to, '퇴   사', { font: BOLD });
+                    merge(r, D1 + row.to, r, DN);
+                }
+                const rng = dayRange(r);
+                put(r, C_HOL, { formula: `$B$3-${L(C_OFF)}${r}` }, { font: BOLD, numFmt: '0"일"' });
+                put(r, C_SIGN, null);
+                put(r, C_TOT, { formula: `SUM(${L(C_OFF)}${r}:${L(C_CON)}${r})` }, { font: BOLD });
+                put(r, C_OFF, { formula: `COUNTIF(${rng},"휴")` });
+                put(r, C_ANN, { formula: `COUNTIF(${rng},"연")` });
+                put(r, C_CON, { formula: `COUNTIF(${rng},"경")` });
+                put(r, C_WKD, { formula: ['토', '일', '공'].map(w => `COUNTIFS(${rng},"휴",${hdrRange},"${w}")`).join('+') }, { font: BOLD });
+            }
+
+            // 그날 재직 인원 - 휴무 표기 인원 (근무인원 수식)
+            function presentFormula(col, r1, r2, rows, i) {
+                const active = rows.filter(row => i + 1 >= row.from && i + 1 <= row.to).length;
+                if (!rows.length) return 0;
+                const rng = `${col}${r1}:${col}${r2}`;
+                return active + XLSX_ABSENT_CODES.map(code => `-COUNTIF(${rng},"${code}")`).join('');
+            }
+
+            model.managers.forEach((row, k) => {
+                writeMember(R_MGR + k, row, '점장' + (row.note ? '\n' + row.note : ''));
+            });
+
+            // 매장운영 근무인원 줄
+            ws.getRow(R_GROUP).height = 23.25;
+            put(R_GROUP, 1, '매장운영', { font: BOLD });
+            put(R_GROUP, 2, '근무인원', { font: BOLD }); merge(R_GROUP, 2, R_GROUP, 3);
+            for (let i = 0; i < N; i++) {
+                const col = L(D1 + i);
+                const f = presentFormula(col, R_STAFF, R_LAST, model.staff, i);
+                put(R_GROUP, D1 + i, typeof f === 'number' ? f : { formula: f }, { font: { size: 8, bold: true }, numFmt: '0"명"' });
+            }
+            for (let c = C_HOL; c <= C_WKD; c++) if (c !== C_GAP) put(R_GROUP, c, null);
+
+            model.staff.forEach((row, k) => {
+                writeMember(R_STAFF + k, row, row.note || '');
+            });
+
+            // ---- 근무인원 합계 ----
+            put(R_SUM, 1, '근무인원', { font: BOLD }); merge(R_SUM, 1, R_SUM2, 1);
+            put(R_SUM, 2, '계', { font: BOLD }); merge(R_SUM, 2, R_SUM, 3);
+            put(R_RATE, 2, '총원 대비', { font: { size: 8 } }); merge(R_RATE, 2, R_RATE, 3);
+            put(R_SUM2, 2, '점장+CAT담당', { font: { size: 8 } }); merge(R_SUM2, 2, R_SUM2, 3);
+            for (let i = 0; i < N; i++) {
+                const col = L(D1 + i);
+                let f = `${col}${R_GROUP}`;
+                if (model.managers.length) {
+                    const mf = presentFormula(col, R_MGR, R_GROUP - 1, model.managers, i);
+                    f += '+' + mf;
+                }
+                put(R_SUM, D1 + i, { formula: f }, { font: { size: 8, bold: true }, numFmt: '0"명"' });
+                put(R_RATE, D1 + i, { formula: `IF($B$2=0,0,${col}${R_SUM}/$B$2)` }, { font: { size: 7 }, numFmt: '0%' });
+                put(R_SUM2, D1 + i, { formula: `${col}${R_SUM}` }, { font: { size: 8 }, numFmt: '0"명"' });
+            }
+            put(R_SUM, C_HOL, null); merge(R_SUM, C_HOL, R_SUM2, C_SIGN);
+            [R_SUM, R_RATE, R_SUM2].forEach(r => { ws.getRow(r).height = 17; });
+
+            // ---- 범례 ----
+            ws.getRow(R_LEG - 1).height = 7.5;
+            put(R_LEG, 1, '근무시간', { font: BOLD });
+            put(R_LEG, 2, '표기', { font: BOLD });
+            put(R_LEG, 3, '휴무구분', { font: BOLD });
+            put(R_LEG, 4, '표기', { font: BOLD }); merge(R_LEG, 4, R_LEG, 5);
+            const legendRows = Math.max(XLSX_SHIFT_LEGEND.length, XLSX_OFF_LEGEND.length);
+            for (let k = 0; k < legendRows; k++) {
+                const r = R_LEG + 1 + k;
+                const shift = XLSX_SHIFT_LEGEND[k];
+                const off = XLSX_OFF_LEGEND[k];
+                if (shift) {
+                    const look = XLSX_CODE_LOOK[shift[1]] || {};
+                    put(r, 1, shift[0], { font: { size: 8 } });
+                    put(r, 2, shift[1], { font: BOLD, fill: look.fill });
+                    if (shift[0].includes('\n')) ws.getRow(r).height = 23;
+                }
+                if (off) {
+                    const look = XLSX_CODE_LOOK[off[1]] || {};
+                    put(r, 3, off[0]);
+                    put(r, 4, off[1], { font: look.font ? { bold: true, color: { argb: look.font } } : BOLD });
+                    merge(r, 4, r, 5);
+                }
+            }
+            const R_LEG_END = R_LEG + legendRows;
+
+            // ---- 조건부 서식 (엑셀에서 표기를 바꾸면 색이 자동으로 바뀜) ----
+            const cfRules = Object.entries(XLSX_CODE_LOOK).map(([code, look], idx) => {
+                const style = { font: { bold: true, color: { argb: look.font || 'FF000000' } } };
+                if (look.fill) style.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: look.fill }, bgColor: { argb: look.fill } };
+                return { type: 'cellIs', operator: 'equal', formulae: [`"${code}"`], style, priority: idx + 1 };
+            });
+            if (model.managers.length) {
+                ws.addConditionalFormatting({ ref: `${L(D1)}${R_MGR}:${L(DN)}${R_GROUP - 1}`, rules: cfRules });
+            }
+            if (model.staff.length) {
+                ws.addConditionalFormatting({ ref: `${L(D1)}${R_STAFF}:${L(DN)}${R_LAST}`, rules: cfRules });
+            }
+
+            // ---- 병합 / 테두리 ----
+            merges.forEach(([r1, c1, r2, c2]) => ws.mergeCells(r1, c1, r2, c2));
+
+            box(R_HEAD1, 1, R_SUM2, C_SIGN, MEDIUM);                       // 본문
+            box(R_HEAD1, 1, R_HEAD2, C_SIGN, MEDIUM);                      // 머리글
+            box(R_GROUP, 1, R_GROUP, C_SIGN, MEDIUM);                      // 매장운영 줄
+            box(R_SUM, 1, R_SUM2, C_SIGN, MEDIUM);                         // 합계
+            box(R_HEAD1, C_TOT, Math.max(R_LAST, R_GROUP), C_WKD, MEDIUM); // 휴무구분
+            box(R_HEAD1, C_WKD, Math.max(R_LAST, R_GROUP), C_WKD, MEDIUM);
+            box(R_LEG, 1, R_LEG + XLSX_SHIFT_LEGEND.length, 2, THIN);
+            box(R_LEG, 3, R_LEG_END, 5, THIN);
+
+            const borders = {};
+            boxes.forEach(([r1, c1, r2, c2, outline]) => {
+                for (let r = r1; r <= r2; r++) {
+                    for (let c = c1; c <= c2; c++) {
+                        const key = r + ',' + c;
+                        const b = borders[key] || { top: THIN, left: THIN, bottom: THIN, right: THIN };
+                        if (r === r1) b.top = outline;
+                        if (r === r2) b.bottom = outline;
+                        if (c === c1) b.left = outline;
+                        if (c === c2) b.right = outline;
+                        borders[key] = b;
+                    }
+                }
+            });
+            Object.entries(borders).forEach(([key, b]) => {
+                const [r, c] = key.split(',').map(Number);
+                const cell = ws.getCell(r, c);
+                const style = { ...cell.style, border: b };
+                if (!style.font) style.font = FONT;
+                cell.style = style;
+            });
+
+            ws.pageSetup.printArea = `A1:${L(C_WKD)}${R_LEG_END}`;
+            return wb;
+        }
+        // ==== XLSX BUILDER END ====
+
+        function buildExportModel(year, month, daysInMonth) {
+            const days = [];
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayIdx = new Date(year, month - 1, d).getDay();
+                const holiday = getHolidayName(year, month, d);
+                const weekend = dayIdx === 0 || dayIdx === 6;
+                days.push({ day: d, label: holiday && !weekend ? '공' : weekdaysKr[dayIdx], red: weekend || !!holiday });
+            }
+            const toRow = (m) => {
+                let from = 0, to = 0;
+                const codes = [];
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = dateKey(year, month, d);
+                    if (isActiveOn(m, dateStr)) {
+                        if (!from) from = d;
+                        to = d;
+                        codes.push(toXlsxCode(getStatus(dateStr, m)));
+                    } else {
+                        codes.push('');
+                    }
+                }
+                return { title: m.title, name: m.name, note: m.note || '', codes, from, to };
+            };
+            const members = membersForMonth(year, month, daysInMonth);
+            return {
+                year, month, storeName: STORE_NAME,
+                quota: getTargetOffDays(year, month, daysInMonth),
+                days,
+                managers: members.filter(m => m.role === 'manager').map(toRow),
+                staff: members.filter(m => m.role !== 'manager').map(toRow)
+            };
+        }
+
+        let excelJsPromise = null;
+        function loadExcelJs() {
+            if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+            if (!excelJsPromise) {
+                excelJsPromise = new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+                    s.onload = () => resolve(window.ExcelJS);
+                    s.onerror = () => { excelJsPromise = null; reject(new Error('엑셀 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.')); };
+                    document.head.appendChild(s);
+                });
+            }
+            return excelJsPromise;
+        }
+
+        async function downloadExcel() {
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            try {
+                const ExcelJS = await loadExcelJs();
+                const wb = buildScheduleWorkbook(ExcelJS, buildExportModel(year, month, daysInMonth));
+                const buffer = await wb.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `${year}_${month}월 매장 근무표(${STORE_NAME.replace(/점$/, '')}).xlsx`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            } catch (err) {
+                reportError('엑셀 다운로드', err);
+            }
+        }
+
+        // ====================================================
+        // 6) 직원 관리 (관리자)
+        // ====================================================
+        let rosterDraft = [];
+
+        function openRosterModal() {
+            if (!isAdmin) return;
+            rosterDraft = roster.map(m => ({ ...m }));
+            document.getElementById('rosterError').style.display = 'none';
+            renderRosterRows();
+            document.getElementById('rosterModal').style.display = 'flex';
+        }
+
+        function closeRosterModal() {
+            document.getElementById('rosterModal').style.display = 'none';
+        }
+
+        function addRosterRow() {
+            rosterDraft.push({
+                id: 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                title: '사원', name: '', type: 'general', role: 'staff', start: '', end: '', note: ''
+            });
+            renderRosterRows();
+        }
+
+        function moveRosterRow(i, delta) {
+            const j = i + delta;
+            if (j < 0 || j >= rosterDraft.length) return;
+            [rosterDraft[i], rosterDraft[j]] = [rosterDraft[j], rosterDraft[i]];
+            renderRosterRows();
+        }
+
+        function removeRosterRow(i) {
+            const m = rosterDraft[i];
+            if (!confirm(`${m.name || '(이름 없음)'} 직원을 명단에서 삭제할까요?\n퇴사한 직원이면 삭제 대신 퇴사일을 넣는 것을 권장합니다.`)) return;
+            rosterDraft.splice(i, 1);
+            renderRosterRows();
+        }
+
+        function renderRosterRows() {
+            const tbody = document.getElementById('rosterBody');
+            tbody.innerHTML = '';
+            rosterDraft.forEach((m, i) => {
+                const tr = document.createElement('tr');
+                const td = (el) => { const cell = document.createElement('td'); cell.appendChild(el); tr.appendChild(cell); };
+                const input = (field, type = 'text', placeholder = '') => {
+                    const el = document.createElement('input');
+                    el.type = type;
+                    el.value = m[field] || '';
+                    el.placeholder = placeholder;
+                    el.oninput = () => { m[field] = el.value; };
+                    return el;
+                };
+                const select = (field, options) => {
+                    const el = document.createElement('select');
+                    options.forEach(([value, label]) => el.add(new Option(label, value, false, m[field] === value)));
+                    el.onchange = () => { m[field] = el.value; };
+                    return el;
+                };
+                td(select('role', [['staff', '직원'], ['manager', '점장']]));
+                td(input('title', 'text', '사원'));
+                td(input('name', 'text', '이름'));
+                td(select('type', [['general', '일반'], ['ar', 'AR']]));
+                td(input('start', 'date'));
+                td(input('end', 'date'));
+                td(input('note', 'text', '예) 5월 이월 휴무 1일 사용'));
+
+                const actions = document.createElement('td');
+                actions.className = 'col-actions';
+                [['↑', () => moveRosterRow(i, -1)], ['↓', () => moveRosterRow(i, 1)], ['삭제', () => removeRosterRow(i)]]
+                    .forEach(([label, fn]) => {
+                        const b = document.createElement('button');
+                        b.type = 'button';
+                        b.className = label === '삭제' ? 'btn-reset' : 'btn-neutral';
+                        b.textContent = label;
+                        b.onclick = fn;
+                        actions.appendChild(b);
+                    });
+                tr.appendChild(actions);
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function saveRosterFromModal() {
+            const errorDiv = document.getElementById('rosterError');
+            const showError = (msg) => { errorDiv.textContent = msg; errorDiv.style.display = 'block'; };
+            const members = rosterDraft.map(m => ({
+                ...m, name: (m.name || '').trim(), title: (m.title || '').trim(), note: (m.note || '').trim()
+            }));
+
+            if (!members.length) return showError('직원이 최소 1명은 있어야 합니다.');
+            if (members.length > 50) return showError('직원은 최대 50명까지 등록할 수 있습니다.');
+            if (members.some(m => !m.name)) return showError('성명이 비어 있는 줄이 있습니다.');
+            if (members.some(m => !/^[가-힣A-Za-z0-9 ]{1,20}$/.test(m.name))) return showError('성명은 한글/영문/숫자로 20자 이내로 입력해주세요.');
+            const names = members.map(m => m.name);
+            const dup = names.find((n, i) => names.indexOf(n) !== i);
+            if (dup) return showError(`같은 이름이 두 번 있습니다: ${dup}`);
+            const badRange = members.find(m => m.start && m.end && m.end < m.start);
+            if (badRange) return showError(`${badRange.name}: 퇴사일이 입사일보다 빠릅니다.`);
+
+            try {
+                await saveRoster(members);
+                await recordChange({ action: 'roster' });
+                closeRosterModal();
+            } catch (err) {
+                showError('저장 중 오류: ' + (err && err.message ? err.message : err));
+            }
         }
 
         // 화면의 onclick="..." 버튼들이 모듈 안의 함수를 찾을 수 있도록 연결
         Object.assign(window, {
             renderAll, refreshFromServer, toggleView, downloadExcel, resetData,
             changeMode, onQuotaChange, triggerHeaderImageChange, onHeaderImageSelected,
-            closeLoginModal, confirmLoginModal, adminLogout
+            closeLoginModal, confirmLoginModal, adminLogout,
+            openRosterModal, closeRosterModal, addRosterRow, saveRosterFromModal
         });
 
         init();

@@ -46,11 +46,41 @@
   }
   .brand-logo-area h1 span { color: var(--ace-red); }
   .brand-sub { font-size: 13px; color: #CCCCCC; margin: 0; }
-  .brand-badge {
-    background: var(--ace-red); color: #fff; font-size: 11px; font-weight: 800;
-    padding: 6px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
-    box-shadow: 0 2px 6px rgba(232, 45, 52, 0.4);
+  .brand-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; margin-left: 12px; }
+  /* 근무표(sch) <-> 퀵 배차(t1) 이동 버튼 */
+  .nav-switch {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    background: var(--ace-red); color: #fff; font-size: 13px; font-weight: 800; text-decoration: none;
+    padding: 8px 14px; border-radius: 20px; box-shadow: 0 2px 6px rgba(232, 45, 52, 0.4);
   }
+  .nav-switch:hover { filter: brightness(0.92); }
+  @media (max-width: 480px) {
+    .brand-header { padding: 16px; }
+    .brand-logo-area h1 { font-size: 18px; }
+  }
+  .logout-link {
+    background: none; border: none; padding: 0; min-width: 0; flex: none;
+    color: #AAAAAA; font-size: 11.5px; font-weight: 600; text-decoration: underline; cursor: pointer;
+  }
+
+  /* 로그인 화면 */
+  .login-gate {
+    position: fixed; inset: 0; z-index: 10000; background: rgba(17, 19, 24, 0.75);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .login-box {
+    background: #fff; border-radius: 16px; padding: 24px; width: min(320px, 100%);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.25); border-top: 4px solid var(--ace-red);
+  }
+  .login-box h3 { margin: 0 0 6px; font-size: 16px; font-weight: 900; }
+  .login-box p { margin: 0 0 16px; font-size: 13px; color: var(--ink-soft); line-height: 1.4; }
+  .login-box input[type="password"] {
+    width: 100%; font-size: 24px; letter-spacing: 10px; text-align: center; padding: 12px;
+    border-radius: 10px; border: 1px solid var(--line); font-family: inherit;
+  }
+  .login-error { color: var(--ace-red); font-size: 12px; margin-top: 8px; min-height: 16px; }
+  .login-box .btn-row { margin-top: 12px; }
+  .login-box .nav-switch { justify-content: center; margin-top: 10px; background: transparent; color: var(--ink-soft); box-shadow: none; border: 1px solid var(--line); width: 100%; }
 
   /* 차량 규격 가이드 패널 스타일 (상세 폭/높이 보강) */
   .guide-panel {
@@ -166,7 +196,10 @@
       <h1>ACE HARDWARE <span>DISPATCH</span></h1>
       <p class="brand-sub">에이스하드웨어 스마트 퀵 배차요청 시스템</p>
     </div>
-    <div class="brand-badge">Official</div>
+    <div class="brand-right">
+      <a class="nav-switch" href="../sch/">📅 근무표</a>
+      <button type="button" class="logout-link" id="logoutBtn" style="display:none;">로그아웃</button>
+    </div>
   </div>
 
   <!-- 차량 규격 및 상세 적재함 가이드 패널 (길이·폭·높이 완벽 표기) -->
@@ -302,6 +335,21 @@
   </div>
 </div>
 
+<!-- 로그인 화면: 근무표와 같은 관리자 계정(이메일)으로 로그인해야 사용할 수 있습니다 -->
+<div id="loginGate" class="login-gate">
+  <div class="login-box">
+    <h3>로그인</h3>
+    <p>비밀번호(숫자 6자리)를 입력하세요.</p>
+    <input type="password" id="loginPassword" placeholder="······"
+           inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password">
+    <div class="login-error" id="loginError"></div>
+    <div class="btn-row">
+      <button type="button" class="btn-save" id="loginBtn">로그인</button>
+    </div>
+    <a class="nav-switch" href="../sch/">📅 근무표로 이동</a>
+  </div>
+</div>
+
 <script type="module">
   // ====================================================
   // 1) 파이어베이스 설정 (근무표 앱과 같은 acetgw 프로젝트를 사용합니다)
@@ -310,6 +358,9 @@
   import {
     getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyC8yo_L_nvWzPg1DxJ5OZtTGb3NkTHHwws",
@@ -322,6 +373,11 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  // 근무표(sch)와 같은 관리자 계정. 비밀번호(숫자 6자리)만 입력받아 이 이메일로 로그인합니다.
+  // 같은 사이트라 근무표에서 로그인했으면 여기서도 로그인된 상태로 열립니다.
+  const ADMIN_EMAIL = 'muzon00@gmail.com';
 
   // ====================================================
   // 2) 파이어스토어 저장 구조
@@ -619,7 +675,55 @@
     setDefaultDates(); render(); $('status').textContent = ''; clearInvalidStyles();
   });
 
-  setDefaultDates(); loadLocalDefaults(); render(); loadRecent(5);
+  // ====================================================
+  // 4) 로그인 (이메일/비밀번호 - Firebase 인증)
+  // ====================================================
+  async function login() {
+    const password = $('loginPassword').value.trim();
+    const errorDiv = $('loginError');
+    if (!/^[0-9]{6}$/.test(password)) {
+      errorDiv.textContent = '비밀번호는 숫자 6자리로 입력해주세요.';
+      return;
+    }
+    $('loginBtn').disabled = true;
+    try {
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
+      errorDiv.textContent = '';
+      $('loginPassword').value = '';
+    } catch (err) {
+      const code = err && err.code;
+      if (code === 'auth/too-many-requests') {
+        errorDiv.textContent = '시도 횟수가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+      } else if (code === 'auth/network-request-failed') {
+        errorDiv.textContent = '인터넷 연결을 확인해주세요.';
+      } else {
+        errorDiv.textContent = '비밀번호가 올바르지 않습니다.';
+      }
+      $('loginPassword').select();
+    } finally {
+      $('loginBtn').disabled = false;
+    }
+  }
+
+  $('loginBtn').addEventListener('click', login);
+  $('loginPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+  $('logoutBtn').addEventListener('click', async () => {
+    try { await signOut(auth); } catch (err) { reportError('로그아웃', err); }
+  });
+
+  onAuthStateChanged(auth, (user) => {
+    const ok = !!user && user.email === ADMIN_EMAIL;
+    $('loginGate').style.display = ok ? 'none' : 'flex';
+    $('logoutBtn').style.display = ok ? 'inline' : 'none';
+    if (ok) {
+      loadRecent(5);
+    } else {
+      $('recentList').innerHTML = '<li class="recent-empty">로그인 후 볼 수 있어요.</li>';
+      setTimeout(() => $('loginPassword').focus(), 50);
+    }
+  });
+
+  setDefaultDates(); loadLocalDefaults(); render();
 </script>
 </body>
 </html>

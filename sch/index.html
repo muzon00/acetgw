@@ -85,6 +85,23 @@
             color: var(--text-main);
             letter-spacing: -0.01em;
         }
+        /* 근무표(sch) <-> 퀵 배차(t1) 이동 버튼 */
+        .nav-switch {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            background: var(--primary);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            padding: 8px 14px;
+            border-radius: 20px;
+            transition: 0.15s;
+        }
+        .nav-switch:hover { background: var(--primary-dark); }
 
         .modal-overlay {
             position: fixed;
@@ -390,6 +407,7 @@
             <span id="headerLogoPlaceholder" class="header-logo-placeholder">🏢</span>
         </button>
         <span class="header-title">매장 근무표</span>
+        <a class="nav-switch" href="../t1/">🚚 퀵 배차</a>
         <input type="file" id="headerImageInput" accept="image/*" style="display:none;" onchange="onHeaderImageSelected(event)">
     </header>
 

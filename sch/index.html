@@ -125,6 +125,17 @@
         .roster-table .col-actions { white-space: nowrap; }
         .roster-table .col-actions button { padding: 4px 8px; font-size: 12px; }
         .roster-hint { font-size: 12px; color: var(--text-sub); margin: 8px 0 0; line-height: 1.5; }
+        .who-bar {
+            display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 8px;
+            margin: -4px 0 16px; font-size: 14px; font-weight: 600;
+        }
+        .who-bar .who-hint { font-size: 12px; font-weight: 400; color: var(--text-sub); }
+        .who-bar.need-pick select { border-color: var(--emp-color); box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18); }
+        .emp-item.locked { cursor: default; opacity: 0.55; }
+        .emp-item.locked:hover { filter: none; transform: none; box-shadow: none; }
+        .emp-item.mine { outline: 2px solid var(--emp-color); outline-offset: -1px; }
+        .log-table td { white-space: nowrap; }
+        .log-table td.wrap { white-space: normal; }
 
         h1 {
             text-align: center;
@@ -401,7 +412,15 @@
     <div id="adminBar" style="display:none; text-align:center; margin-bottom:16px; font-size:13px; color:var(--text-sub);">
         관리자로 로그인됨: <strong id="adminEmailLabel"></strong>
         <button type="button" class="btn-neutral" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="openRosterModal()">직원 관리</button>
+        <button type="button" class="btn-neutral" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="openHolidayModal()">공휴일 관리</button>
+        <button type="button" class="btn-neutral" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="openLogModal()">변경 기록</button>
         <button type="button" class="btn-neutral" style="padding:4px 10px; font-size:12px; margin-left:8px;" onclick="adminLogout()">로그아웃</button>
+    </div>
+
+    <div id="whoBar" class="who-bar">
+        내 이름:
+        <select id="whoSelect" onchange="onWhoChange()"></select>
+        <span class="who-hint">본인 이름을 선택하면 본인 휴무만 신청할 수 있습니다.</span>
     </div>
 
     <div class="controls">
@@ -410,7 +429,7 @@
         <button class="btn-refresh" onclick="refreshFromServer()">새로고침</button>
         <button class="btn-neutral" id="toggleBtn" onclick="toggleView()">엑셀 양식으로 보기</button>
         <button class="btn-excel" onclick="downloadExcel()">엑셀 파일(.xlsx) 다운로드</button>
-        <button class="btn-reset" onclick="resetData()">전체 초기화</button>
+        <button class="btn-reset" onclick="resetData()">이번 달 초기화</button>
         <button class="btn-neutral" onclick="window.print()">인쇄</button>
     </div>
 
@@ -427,7 +446,7 @@
             <div class="target-info">
                 이번 달 휴무 목표일수:
                 <select id="quotaSelect" onchange="onQuotaChange()"></select>
-                <div style="font-size: 11px; color: var(--text-sub); margin-top: 6px;">직접 선택 가능 (8~15일)</div>
+                <div id="quotaHint" style="font-size: 11px; color: var(--text-sub); margin-top: 6px;">관리자만 변경할 수 있습니다</div>
             </div>
             <table class="summary-table">
                 <thead>
@@ -501,6 +520,41 @@
         </div>
     </div>
 
+    <div id="holidayModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box wide" style="width:min(560px, 100%);">
+            <h3><span id="holidayYearLabel"></span>년 공휴일 관리</h3>
+            <p>근무표의 빨간 날짜와 엑셀의 '공' 표시, 주말/공휴일 휴무일수 계산에 쓰입니다. 매년 한국천문연구원 월력요항과 비교해 확인해주세요.</p>
+            <table class="roster-table">
+                <thead><tr><th style="width:140px;">날짜</th><th>이름</th><th style="width:70px;">출처</th><th></th></tr></thead>
+                <tbody id="holidayBody"></tbody>
+            </table>
+            <div style="display:flex; gap:6px; margin-top:10px;">
+                <input type="date" id="holidayNewDate" style="padding:6px; border:1px solid var(--border); border-radius:6px; font-family:inherit;">
+                <input type="text" id="holidayNewName" placeholder="예) 임시공휴일" style="flex:1; padding:6px; border:1px solid var(--border); border-radius:6px; font-family:inherit;">
+                <button type="button" class="btn-neutral" onclick="addHolidayRow()">추가</button>
+            </div>
+            <div id="holidayError" class="modal-error"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn-neutral" onclick="closeHolidayModal()">취소</button>
+                <button type="button" class="btn-primary" onclick="saveHolidaysFromModal()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="logModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box wide">
+            <h3>변경 기록 (최근 200건)</h3>
+            <p>직원 모드의 '내 이름'은 본인 확인 없이 선택하는 방식이라, 기록된 이름은 참고용입니다.</p>
+            <table class="roster-table log-table">
+                <thead><tr><th>변경 시각</th><th>변경한 사람</th><th>대상</th><th>근무일</th><th>변경 내용</th></tr></thead>
+                <tbody id="logBody"></tbody>
+            </table>
+            <div class="modal-actions">
+                <button type="button" class="btn-neutral" onclick="closeLogModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         // ====================================================
         // 1) 파이어베이스 설정
@@ -509,8 +563,8 @@
         // ====================================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import {
-            getFirestore, collection, doc, getDoc, getDocs, setDoc,
-            onSnapshot, writeBatch
+            getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc,
+            onSnapshot, writeBatch, query, orderBy, limit
         } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
         import {
             getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
@@ -587,6 +641,44 @@
             return (scheduleData[dateStr] && scheduleData[dateStr][member.id]) || '';
         }
 
+        // ====== 직원 모드 '내 이름' (이 브라우저에 기억) ======
+        const WHO_KEY = 'sch.myMemberId';
+        let myMemberId = '';
+        try { myMemberId = localStorage.getItem(WHO_KEY) || ''; } catch (e) { /* 저장소 사용 불가 */ }
+
+        function myMember() {
+            return roster.find(m => m.id === myMemberId) || null;
+        }
+
+        // 변경 기록에 남길 '변경한 사람'
+        function currentActorName() {
+            if (isAdmin && currentMode === 'manager') return '관리자';
+            const me = myMember();
+            if (me) return me.name;
+            return isAdmin ? '관리자' : '';
+        }
+
+        // 이 칸을 지금 누를 수 있는지
+        function canEditMember(member) {
+            if (isAdmin) return true;                 // 관리자는 모든 직원
+            return currentMode === 'employee' && member.id === myMemberId;
+        }
+
+        function renderWhoSelect() {
+            const sel = document.getElementById('whoSelect');
+            sel.innerHTML = '';
+            sel.add(new Option('- 이름 선택 -', ''));
+            roster.forEach(m => sel.add(new Option(`${m.name} (${m.title})`, m.id, false, m.id === myMemberId)));
+            if (myMemberId && !myMember()) sel.value = '';
+            document.getElementById('whoBar').classList.toggle('need-pick', !myMember());
+        }
+
+        function onWhoChange() {
+            myMemberId = document.getElementById('whoSelect').value;
+            try { localStorage.setItem(WHO_KEY, myMemberId); } catch (e) { /* 저장소 사용 불가 */ }
+            renderAll();
+        }
+
         const cycleEmp = ['', '휴무', '필수휴무', '연차', '반차', '본사', '교육', '공가'];
         const cycleMgrGeneral = ['', '조출', '09~19', '마감'];
         const cycleMgrAR = ['', '07~16', '11~20'];
@@ -611,22 +703,40 @@
             '10-09': '한글날', '12-25': '성탄절'
         };
 
+        // 해마다 날짜가 바뀌는 공휴일 (설날·추석·부처님오신날·대체공휴일·선거일)
+        // 여기에 없는 해는 관리자 > 공휴일 관리 에서 추가 (settings/holidays 에 저장)
         const variableHolidays = {
             '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
             '2026-03-02': '대체공휴일', '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일',
             '2026-06-03': '지방선거', '2026-08-17': '대체공휴일',
             '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴', '2026-09-28': '대체공휴일',
             '2026-10-05': '대체공휴일',
+
+            '2027-02-05': '설날 연휴', '2027-02-06': '설날', '2027-02-07': '설날 연휴', '2027-02-08': '대체공휴일',
+            '2027-05-13': '부처님오신날', '2027-08-16': '대체공휴일',
+            '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴',
+            '2027-10-04': '대체공휴일', '2027-10-11': '대체공휴일', '2027-12-27': '대체공휴일',
         };
+
+        // 관리자가 추가/삭제한 공휴일 { 'YYYY-MM-DD': '이름' }  (이름이 '' 이면 기본 공휴일을 끔)
+        let customHolidays = {};
 
         const weekdaysKr = ['일', '월', '화', '수', '목', '금', '토'];
 
         function getHolidayName(year, month, day) {
             const md = `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const ymd = `${year}-${md}`;
+            if (Object.prototype.hasOwnProperty.call(customHolidays, ymd)) return customHolidays[ymd] || null;
             if (variableHolidays[ymd]) return variableHolidays[ymd];
             if (fixedHolidays[md]) return fixedHolidays[md];
             return null;
+        }
+
+        // 설날·추석 같은 해마다 바뀌는 공휴일이 그 해에 하나라도 등록되어 있는지
+        function hasVariableHolidays(year) {
+            const prefix = year + '-';
+            return Object.keys(variableHolidays).some(k => k.startsWith(prefix))
+                || Object.entries(customHolidays).some(([k, v]) => k.startsWith(prefix) && v);
         }
 
         function escapeHtml(value) {
@@ -635,9 +745,19 @@
             ));
         }
 
+        // Firebase 오류 코드를 사용자에게 보여줄 한글 문장으로 변환
+        function friendlyError(err) {
+            const code = (err && err.code) || '';
+            if (code === 'permission-denied') return '권한이 없어 저장되지 않았습니다.\n(관리자만 바꿀 수 있는 항목이거나, 관리자가 배정한 근무입니다.)';
+            if (code === 'unauthenticated') return '로그인이 만료되었습니다. 다시 로그인해주세요.';
+            if (code === 'unavailable' || code === 'deadline-exceeded') return '인터넷 연결이 불안정해 저장하지 못했습니다. 잠시 후 다시 시도해주세요.';
+            if (code === 'resource-exhausted') return '사용량 한도를 넘었습니다. 잠시 후 다시 시도해주세요.';
+            return (err && err.message) ? err.message : String(err);
+        }
+
         function reportError(action, err) {
             console.error(action, err);
-            alert(action + ' 중 오류가 발생했습니다.\n' + (err && err.message ? err.message : err));
+            alert(`${action}에 실패했습니다.\n${friendlyError(err)}`);
         }
 
         // ====================================================
@@ -651,6 +771,7 @@
                     date: (meta && meta.date) || '',
                     name: (meta && meta.name) || '',
                     status: (meta && meta.status) || '',
+                    actor: currentActorName(),
                     action: (meta && meta.action) || 'update'
                 });
             } catch (err) {
@@ -658,21 +779,48 @@
             }
         }
 
-        // 한 사람의 하루 상태 저장 (해당 날짜 문서 하나만 갱신)
-        async function saveDayStatus(dateStr, member, status) {
+        // 변경 기록 (logs 컬렉션, 관리자만 열람)
+        async function addLog(entry) {
             try {
-                await setDoc(doc(db, 'schedule', dateStr), { [member.id]: status }, { merge: true });
-                await recordChange({ date: dateStr, name: member.name, status: status, action: 'update' });
+                await addDoc(collection(db, 'logs'), {
+                    ts: Date.now(),
+                    clientId: clientId,
+                    action: entry.action || 'update',
+                    date: entry.date || '',
+                    name: entry.name || '',
+                    from: entry.from || '',
+                    to: entry.to || '',
+                    actor: currentActorName()
+                });
             } catch (err) {
-                reportError('저장', err);
+                console.error('addLog', err);
             }
         }
 
-        async function saveMonthlyQuota(yearMonth, quota) {
+        // 한 사람의 하루 상태 저장 (해당 날짜 문서 하나만 갱신)
+        // 실패하면 화면 값을 이전 상태로 되돌림
+        async function saveDayStatus(dateStr, member, status, prevStatus) {
+            try {
+                await setDoc(doc(db, 'schedule', dateStr), { [member.id]: status }, { merge: true });
+            } catch (err) {
+                if (!scheduleData[dateStr]) scheduleData[dateStr] = {};
+                scheduleData[dateStr][member.id] = prevStatus;
+                renderAll();
+                reportError(`${member.name} ${dateStr} 저장`, err);
+                return;
+            }
+            await recordChange({ date: dateStr, name: member.name, status: status, action: 'update' });
+            await addLog({ action: 'update', date: dateStr, name: member.name, from: prevStatus, to: status });
+        }
+
+        async function saveMonthlyQuota(yearMonth, quota, prevQuota) {
             try {
                 await setDoc(doc(db, 'settings', 'monthlyQuotas'), { [yearMonth]: quota }, { merge: true });
                 await recordChange({ date: yearMonth, status: quota + '일', action: 'quota' });
             } catch (err) {
+                if (prevQuota === undefined) delete monthlyQuotas[yearMonth];
+                else monthlyQuotas[yearMonth] = prevQuota;
+                renderAll();
                 reportError('휴무 목표일수 저장', err);
             }
         }
@@ -690,6 +838,8 @@
             settings = settingsSnap.exists() ? settingsSnap.data() : {};
             monthlyQuotas = quotaSnap.exists() ? quotaSnap.data() : {};
             applyRosterSnapshot(rosterSnap);
+            const holidaySnap = await getDoc(doc(db, 'settings', 'holidays'));
+            customHolidays = holidaySnap.exists() ? holidaySnap.data() : {};
         }
 
         // 명단 문서가 아직 없으면 관리자 로그인 시 기본 명단을 저장해 둠
@@ -731,6 +881,7 @@
                     // 로그아웃되면 관리자 모드에서 자동으로 나감
                     applyModeChange('employee');
                 }
+                renderAll();
             });
         }
 
@@ -743,6 +894,9 @@
             } else {
                 bar.style.display = 'none';
             }
+            // 휴무 목표일수는 관리자만 변경
+            document.getElementById('quotaSelect').disabled = !isAdmin;
+            document.getElementById('quotaHint').textContent = isAdmin ? '직접 선택 가능 (8~15일)' : '관리자만 변경할 수 있습니다';
         }
 
         async function loginAdmin(password) {
@@ -797,6 +951,7 @@
                 mSel.add(new Option(m + '월', m, false, m === 10));
             }
 
+            updateAdminBar();
             renderAll();
             startRealtime();
             watchAuthState();
@@ -823,6 +978,12 @@
                 maybeSeedRoster();
                 renderAll();
             }, (err) => console.error('roster listener', err));
+
+            // 관리자가 추가/삭제한 공휴일
+            onSnapshot(doc(db, 'settings', 'holidays'), (snap) => {
+                customHolidays = snap.exists() ? snap.data() : {};
+                renderAll();
+            }, (err) => console.error('holiday listener', err));
 
             // 월별 휴무 목표일수
             onSnapshot(doc(db, 'settings', 'monthlyQuotas'), (snap) => {
@@ -878,18 +1039,21 @@
             const date = escapeHtml(info.date);
             const status = escapeHtml(info.status);
             let msg;
+            const actor = info.actor ? `${escapeHtml(info.actor)}: ` : '';
             if (info.action === 'reset') {
-                msg = `<strong>근무표 전체 초기화</strong>가 발생했습니다.`;
+                msg = `<strong>${date || ''} 근무표 초기화</strong>가 진행되었습니다.`;
             } else if (info.action === 'quota') {
                 msg = `<strong>${date}</strong> 월의 휴무 목표일수가 <strong>${status}</strong>(으)로 변경되었습니다.`;
             } else if (info.action === 'header_image') {
                 msg = `헤더 이미지가 변경되었습니다.`;
             } else if (info.action === 'roster') {
                 msg = `<strong>직원 명단</strong>이 변경되었습니다.`;
+            } else if (info.action === 'holiday') {
+                msg = `<strong>공휴일 목록</strong>이 변경되었습니다.`;
             } else if (info.name) {
                 const dateLabel = date ? `${date} ` : '';
                 const statusLabel = status ? status : '미지정';
-                msg = `<strong>${escapeHtml(info.name)}</strong>님의 ${dateLabel}근무 정보가 <strong>${statusLabel}</strong>(으)로 변경되었습니다.`;
+                msg = `${actor}<strong>${escapeHtml(info.name)}</strong>님의 ${dateLabel}근무 정보가 <strong>${statusLabel}</strong>(으)로 변경되었습니다.`;
             } else {
                 msg = `새로운 근무 데이터가 입력되었습니다.`;
             }
@@ -923,18 +1087,44 @@
             performReset();
         }
 
+        // 지금 보고 있는 달만 초기화 (엑셀 백업 다운로드 + 서버 백업 후 삭제)
         async function performReset() {
-            if (!confirm("정말 모든 입력 내용을 초기화하시겠습니까? (파이어스토어 근무 데이터도 함께 비워집니다)")) return;
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const ym = getYearMonthKey(year, month);
+
+            if (!confirm(`${year}년 ${month}월 근무 데이터만 초기화합니다. (다른 달은 그대로 유지)\n\n`
+                + `초기화 전에 이 달의 엑셀 파일이 자동으로 다운로드되고, 서버에도 백업이 저장됩니다.\n\n계속할까요?`)) return;
+
+            const dateKeys = [];
+            const monthData = {};
+            for (let d = 1; d <= daysInMonth; d++) {
+                const k = dateKey(year, month, d);
+                dateKeys.push(k);
+                if (scheduleData[k] && Object.keys(scheduleData[k]).length) monthData[k] = scheduleData[k];
+            }
+
+            // 1) 엑셀 백업 (실패하면 초기화 중단)
+            const backedUp = await downloadExcel();
+            if (!backedUp) {
+                alert('백업 엑셀 파일을 만들지 못해 초기화를 취소했습니다.');
+                return;
+            }
+
             try {
-                const snap = await getDocs(collection(db, 'schedule'));
-                const docs = snap.docs;
-                for (let i = 0; i < docs.length; i += 400) {
-                    const batch = writeBatch(db);
-                    docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
-                    await batch.commit();
-                }
-                scheduleData = {};
-                await recordChange({ action: 'reset' });
+                // 2) 서버 백업
+                await addDoc(collection(db, 'backups'), {
+                    ts: Date.now(), month: ym, data: monthData,
+                    roster: roster.map(m => ({ ...m })), by: currentUser ? currentUser.email : ''
+                });
+                // 3) 이 달의 날짜 문서만 삭제
+                const batch = writeBatch(db);
+                dateKeys.forEach(k => batch.delete(doc(db, 'schedule', k)));
+                await batch.commit();
+                dateKeys.forEach(k => { delete scheduleData[k]; });
+                await recordChange({ date: ym, action: 'reset' });
+                await addLog({ action: 'reset', date: ym });
                 renderAll();
             } catch (err) {
                 reportError('초기화', err);
@@ -983,6 +1173,13 @@
                 mgrRadio.checked = true;
                 empRadio.checked = false;
             }
+            updateWhoBarVisibility();
+            renderAll();
+        }
+
+        function updateWhoBarVisibility() {
+            const show = currentMode === 'employee' && currentView === 'calendar';
+            document.getElementById('whoBar').style.display = show ? 'flex' : 'none';
         }
 
         // ====== 로그인 모달 (관리자 모드 전환 / 헤더 이미지 변경 / 초기화 공용) ======
@@ -1000,7 +1197,7 @@
                 document.getElementById('modalTitle').textContent = '헤더 이미지 변경';
                 document.getElementById('modalDesc').textContent = '이미지를 업로드하려면 관리자 비밀번호(숫자 6자리)를 입력하세요.';
             } else if (context === 'reset') {
-                document.getElementById('modalTitle').textContent = '전체 초기화';
+                document.getElementById('modalTitle').textContent = '이번 달 초기화';
                 document.getElementById('modalDesc').textContent = '초기화하려면 관리자 비밀번호(숫자 6자리)를 입력하세요.';
             }
 
@@ -1122,6 +1319,7 @@
                 toggleBtn.textContent = '엑셀 양식으로 보기';
                 currentView = 'calendar';
             }
+            updateWhoBarVisibility();
             renderAll();
         }
 
@@ -1133,6 +1331,7 @@
             document.getElementById('displayYear').textContent = year;
             document.getElementById('displayMonth').textContent = month;
 
+            renderWhoSelect();
             renderCalendar(year, month, daysInMonth);
             renderExcel(year, month, daysInMonth);
 
@@ -1153,6 +1352,14 @@
         }
 
         function cycleStatus(dateStr, member) {
+            if (!canEditMember(member)) {
+                if (currentMode === 'employee' && !myMember()) {
+                    alert('먼저 위쪽 [내 이름]에서 본인 이름을 선택해 주세요.');
+                } else if (currentMode === 'employee') {
+                    alert('본인 휴무만 신청할 수 있습니다.');
+                }
+                return;
+            }
             if (!scheduleData[dateStr]) scheduleData[dateStr] = {};
             const key = member.id;
             let current = scheduleData[dateStr][key] || '';
@@ -1180,7 +1387,7 @@
                 scheduleData[dateStr][key] = cycleMgr[nextIdx];
             }
 
-            saveDayStatus(dateStr, member, scheduleData[dateStr][key]);
+            saveDayStatus(dateStr, member, scheduleData[dateStr][key], current);
             renderAll();
         }
 
@@ -1205,8 +1412,14 @@
                     }
                 }
             });
-            const warnDiv = document.getElementById('warningMsg');
-            warnDiv.innerHTML = warnings.length > 0 ? `⚠️ [알림] ${warnings.join(', ')} 인원이 최대 5일 연속 근무 규정을 초과할 위험이 있습니다.` : '';
+            const messages = [];
+            if (warnings.length > 0) {
+                messages.push(`⚠️ [알림] ${escapeHtml(warnings.join(', '))} 인원이 최대 5일 연속 근무 규정을 초과할 위험이 있습니다.`);
+            }
+            if (!hasVariableHolidays(year)) {
+                messages.push(`⚠️ ${year}년 설날·추석 등 공휴일이 등록되어 있지 않습니다. 관리자 &gt; 공휴일 관리에서 추가해 주세요.`);
+            }
+            document.getElementById('warningMsg').innerHTML = messages.join('<br>');
         }
 
         function getYearMonthKey(year, month) {
@@ -1239,9 +1452,14 @@
             const daysInMonth = new Date(year, month, 0).getDate();
             const key = getYearMonthKey(year, month);
             const value = parseInt(document.getElementById('quotaSelect').value);
+            if (!isAdmin) {
+                updateSummary(year, month, daysInMonth); // 선택칸을 원래 값으로 되돌림
+                return;
+            }
 
+            const prev = monthlyQuotas[key];
             monthlyQuotas[key] = value;
-            saveMonthlyQuota(key, value);
+            saveMonthlyQuota(key, value, prev);
 
             updateSummary(year, month, daysInMonth);
         }
@@ -1307,6 +1525,8 @@
 
                     const item = document.createElement('div');
                     item.className = `emp-item ${getStatusClass(state)}`;
+                    if (currentMode === 'employee' && emp.id === myMemberId) item.classList.add('mine');
+                    else if (!canEditMember(emp) && myMember()) item.classList.add('locked');
                     item.innerHTML = `<span>${escapeHtml(emp.name)}</span><span class="status-text">${displayState}</span>`;
                     item.onclick = () => cycleStatus(dateStr, emp);
                     empList.appendChild(item);
@@ -1723,8 +1943,10 @@
                 link.click();
                 document.body.removeChild(link);
                 setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+                return true;
             } catch (err) {
                 reportError('엑셀 다운로드', err);
+                return false;
             }
         }
 
@@ -1833,8 +2055,158 @@
                 await recordChange({ action: 'roster' });
                 closeRosterModal();
             } catch (err) {
-                showError('저장 중 오류: ' + (err && err.message ? err.message : err));
+                showError('저장 중 오류: ' + friendlyError(err));
             }
+        }
+
+        // ====================================================
+        // 7) 공휴일 관리 (관리자)
+        // ====================================================
+        let holidayDraft = {};
+        let holidayYear = 0;
+
+        function openHolidayModal() {
+            if (!isAdmin) return;
+            holidayYear = parseInt(document.getElementById('yearSelect').value);
+            holidayDraft = { ...customHolidays };
+            document.getElementById('holidayYearLabel').textContent = holidayYear;
+            document.getElementById('holidayNewDate').value = '';
+            document.getElementById('holidayNewName').value = '';
+            document.getElementById('holidayError').style.display = 'none';
+            renderHolidayRows();
+            document.getElementById('holidayModal').style.display = 'flex';
+        }
+
+        function closeHolidayModal() {
+            document.getElementById('holidayModal').style.display = 'none';
+        }
+
+        // 선택한 해의 공휴일 목록 (기본 + 관리자 추가, 관리자가 끈 것은 제외)
+        function holidayListForYear(year, draft) {
+            const list = {};
+            Object.entries(fixedHolidays).forEach(([md, name]) => { list[`${year}-${md}`] = { name, source: '기본' }; });
+            Object.entries(variableHolidays).forEach(([k, name]) => { if (k.startsWith(year + '-')) list[k] = { name, source: '기본' }; });
+            Object.entries(draft).forEach(([k, name]) => {
+                if (!k.startsWith(year + '-')) return;
+                if (name) list[k] = { name, source: '추가' };
+                else delete list[k];
+            });
+            return Object.keys(list).sort().map(k => ({ date: k, ...list[k] }));
+        }
+
+        function renderHolidayRows() {
+            const tbody = document.getElementById('holidayBody');
+            tbody.innerHTML = '';
+            holidayListForYear(holidayYear, holidayDraft).forEach(h => {
+                const tr = document.createElement('tr');
+                const dayIdx = new Date(h.date + 'T00:00:00').getDay();
+                [`${h.date} (${weekdaysKr[dayIdx]})`, h.name, h.source].forEach(text => {
+                    const td = document.createElement('td');
+                    td.textContent = text;
+                    tr.appendChild(td);
+                });
+                const td = document.createElement('td');
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'btn-reset';
+                b.style.padding = '4px 8px';
+                b.style.fontSize = '12px';
+                b.textContent = '삭제';
+                b.onclick = () => {
+                    // 기본 공휴일은 '' 로 꺼두고, 추가한 공휴일은 목록에서 지움
+                    const isBuiltin = variableHolidays[h.date] || fixedHolidays[h.date.slice(5)];
+                    if (isBuiltin) holidayDraft[h.date] = '';
+                    else delete holidayDraft[h.date];
+                    renderHolidayRows();
+                };
+                td.appendChild(b);
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+            });
+        }
+
+        function addHolidayRow() {
+            const date = document.getElementById('holidayNewDate').value;
+            const name = document.getElementById('holidayNewName').value.trim();
+            const errorDiv = document.getElementById('holidayError');
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !name) {
+                errorDiv.textContent = '날짜와 이름을 모두 입력해주세요.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            if (!/^[가-힣A-Za-z0-9 ·()]{1,20}$/.test(name)) {
+                errorDiv.textContent = '이름은 한글/영문/숫자로 20자 이내로 입력해주세요.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            errorDiv.style.display = 'none';
+            holidayDraft[date] = name;
+            if (date.slice(0, 4) !== String(holidayYear)) {
+                holidayYear = parseInt(date.slice(0, 4));
+                document.getElementById('holidayYearLabel').textContent = holidayYear;
+            }
+            document.getElementById('holidayNewDate').value = '';
+            document.getElementById('holidayNewName').value = '';
+            renderHolidayRows();
+        }
+
+        async function saveHolidaysFromModal() {
+            const errorDiv = document.getElementById('holidayError');
+            try {
+                await setDoc(doc(db, 'settings', 'holidays'), holidayDraft);
+                await recordChange({ action: 'holiday' });
+                closeHolidayModal();
+            } catch (err) {
+                errorDiv.textContent = '저장 중 오류: ' + friendlyError(err);
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // ====================================================
+        // 8) 변경 기록 (관리자)
+        // ====================================================
+        async function openLogModal() {
+            if (!isAdmin) return;
+            const tbody = document.getElementById('logBody');
+            tbody.innerHTML = '<tr><td colspan="5">불러오는 중...</td></tr>';
+            document.getElementById('logModal').style.display = 'flex';
+            try {
+                const snap = await getDocs(query(collection(db, 'logs'), orderBy('ts', 'desc'), limit(200)));
+                tbody.innerHTML = '';
+                if (snap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="5">기록이 없습니다.</td></tr>';
+                    return;
+                }
+                snap.forEach(d => {
+                    const log = d.data();
+                    const t = new Date(log.ts);
+                    const when = `${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+                    const change = log.action === 'reset'
+                        ? `${log.date} 월 초기화`
+                        : `${log.from || '미지정'} → ${log.to || '미지정'}`;
+                    const tr = document.createElement('tr');
+                    [when, log.actor || '(이름 미선택)', log.name || '-', log.action === 'reset' ? '-' : log.date, change]
+                        .forEach((text, i) => {
+                            const td = document.createElement('td');
+                            td.textContent = text;
+                            if (i === 4) td.className = 'wrap';
+                            tr.appendChild(td);
+                        });
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                tbody.innerHTML = '';
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 5;
+                td.textContent = '불러오기 실패: ' + friendlyError(err);
+                tr.appendChild(td);
+                tbody.appendChild(tr);
+            }
+        }
+
+        function closeLogModal() {
+            document.getElementById('logModal').style.display = 'none';
         }
 
         // 화면의 onclick="..." 버튼들이 모듈 안의 함수를 찾을 수 있도록 연결
@@ -1842,7 +2214,9 @@
             renderAll, refreshFromServer, toggleView, downloadExcel, resetData,
             changeMode, onQuotaChange, triggerHeaderImageChange, onHeaderImageSelected,
             closeLoginModal, confirmLoginModal, adminLogout,
-            openRosterModal, closeRosterModal, addRosterRow, saveRosterFromModal
+            openRosterModal, closeRosterModal, addRosterRow, saveRosterFromModal,
+            onWhoChange, openHolidayModal, closeHolidayModal, addHolidayRow, saveHolidaysFromModal,
+            openLogModal, closeLogModal
         });
 
         init();
